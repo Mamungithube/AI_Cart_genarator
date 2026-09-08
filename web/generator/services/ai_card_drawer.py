@@ -4,65 +4,47 @@ import json
 import base64
 import logging
 import urllib.request
-from PIL import Image, ImageFilter
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_MSG = """You are an elite Senior Graphic Designer & Art Director specializing in world-class, award-winning corporate and professional visiting cards (like Behance, Dribbble, and GraphicRiver top sellers).
+SYSTEM_MSG = """You are an elite Graphic Design Director specializing in clean, modern, ultra-professional visiting cards.
 
-Analyze the user's prompt with deep creative intelligence. You must strictly understand and support the complete anatomy of a visiting card:
+Analyze the user's prompt with precision and extract ONLY the information explicitly provided.
 
-1. ESSENTIAL INFORMATION:
-   - Name: Full name (prominent, bold, modern typography).
-   - Designation / Title: (e.g., CEO, Manager, Developer, Consultant).
-     * If the user provided a designation: Render it cleanly directly under the name (e.g. 'MANAGING DIRECTOR' or 'LEAD AI ENGINEER').
-     * If the user did NOT explicitly provide a designation: Keep it completely EMPTY ("") and do NOT draw any title or subtitle! ABSOLUTELY DO NOT guess or invent titles like 'Medical Practitioner', 'Doctor', 'Specialist', 'Executive', or 'Engineer'!
-   - Company Name: Company, Clinic, Hospital, Firm, or Lab name.
-   - Phone Number: Mobile/Phone number(s). ONLY if explicitly provided.
+CRITICAL DATA INTEGRITY RULES (ZERO TOLERANCE FOR FAKE OR PLACEHOLDER DATA):
+1. NEVER INVENT OR PREDICT MISSING DATA:
+   - Name: Extract full name.
+   - Designation: ONLY if explicitly stated by user. If not provided, MUST be empty "". DO NOT invent titles like 'Developer', 'Executive', 'Doctor', 'Specialist', etc.
+   - Company Name: ONLY if explicitly stated by user. Otherwise empty "".
+   - Phone Number: ONLY if explicitly stated by user. Otherwise empty "".
+   - Email Address: ONLY if explicitly stated by user. Otherwise empty "".
+   - Address / Chamber Location: FULL address string ONLY if explicitly stated by user. Otherwise empty "".
+   - Working Hours / Visiting Schedule: ONLY if explicitly stated by user. Otherwise empty "".
+   - Website URL: ONLY if explicitly stated by user. Otherwise empty "".
+   - Social Media / Links: ONLY if explicitly stated by user. Otherwise empty "".
 
-2. CONTACT INFORMATION:
-   - Email Address: e.g. alex@neuralcraft.ai. ONLY if provided.
-   - Address: Office, Chamber, Clinic, or Business address (e.g. 'Aqua Tower, Mohakhali, Dhaka'). Extract the FULL address and explicitly instruct DALL-E to render it with a location pin icon (📍).
-   - Website URL: e.g. www.company.com. ONLY if provided.
-
-3. SOCIAL / PROFESSIONAL LINKS:
-   - LinkedIn / GitHub / Twitter / Facebook / Social handles. Render with clean minimalist icons. ONLY if provided.
-
-4. ADDITIONAL / OPTIONAL INFORMATION:
-   - Working Hours / Visiting Schedule: (especially for clinics, doctors, salons, service businesses, e.g. 'Visiting Hours: Sunday to Thursday 09:00 AM to 06:00 PM'). Explicitly instruct DALL-E to render the full schedule with a clock icon (🕒).
-   - Tagline or Slogan / Degrees: (e.g., 'MBBS, FCPS', 'Empowering AI Innovation'). Place elegantly.
-   - Company Logo / Monogram: A stunning vector monogram emblem derived from person's name or company initials (e.g., 'HP', 'AR', 'RI') inside a stylish crest/hexagon badge with glowing neon/metallic accents.
-   - QR Code: If requested or appropriate for tech cards, include a sleek minimalist digital QR code square.
-   - Fax Number: Only if provided.
-
-5. DYNAMIC ASYMMETRIC GRAPHIC LAYOUT (AWARD-WINNING STYLE):
-   - One zone (left): Name, and neatly aligned contact/address/schedule rows with minimalist clean icons.
-   - Opposite zone (right): Flowing organic curved wave or sharp geometric color block holding the glowing vector monogram emblem badge and company/clinic branding.
-   - Professional color harmony suited for the profession (e.g. healthcare/doctor: clean white/pearl base with fresh mint/cyan/emerald green accent wave; tech: dark matte slate with glowing electric cyan blue).
-
-6. 100% FULL-BLEED VISITING CARD:
-   - Standard horizontal landscape (1536x1024).
-   - The visiting card fills 100% of the canvas edge-to-edge.
-   - ABSOLUTELY NO desk, NO table, NO outer border, NO frame, NO studio mockup backdrop. The canvas IS the card surface.
+2. DESIGN STYLE & COLOR THEME:
+   - Select an appropriate modern color theme based on profession or request (e.g. tech: deep obsidian slate with cyan/teal accents; executive: dark navy with gold; medical: clean crisp white with emerald/mint wave).
+   - Determine monogram initials (2-3 letters) derived from the name or company.
 
 Return ONLY a JSON object:
 {
   "name": string,
-  "designation": string (MUST be empty "" if not explicitly stated in prompt),
+  "designation": string,
   "company_name": string,
   "address": string,
   "schedule": string,
   "phone": string,
   "email": string,
   "website": string,
-  "social_media": string,
-  "tagline_or_degrees": string,
-  "dalle_prompt": string
+  "monogram": string,
+  "style_description": string
 }"""
 
 
 def analyze_and_design_card(user_prompt: str, api_key: str) -> dict:
-    """Uses GPT-4o-mini as a Creative Director to extract exact facts and craft the DALL-E prompt."""
+    """Uses GPT-4o-mini as a Creative Director to extract exact facts without hallucination."""
     payload = json.dumps({
         "model": "gpt-4o-mini",
         "messages": [
@@ -99,26 +81,95 @@ def analyze_and_design_card(user_prompt: str, api_key: str) -> dict:
             'phone': '',
             'email': '',
             'website': '',
-            'linkedin': '',
-            'dalle_prompt': (
-                f"Full-bleed visiting card graphic design for {user_prompt[:40]}. "
-                "The visiting card fills 100% of the entire 1536x1024 rectangular canvas edge-to-edge with zero margins, "
-                "zero table, and zero outer background. Elegant typography and refined branding."
-            )
+            'monogram': user_prompt[:2].upper(),
+            'style_description': 'Modern minimalist visiting card design with clean typography and abstract geometric wave'
         }
+
+
+def build_precision_dalle_prompt(card_spec: dict) -> str:
+    """
+    Constructs an airtight DALL-E prompt with:
+    1. A strict whitelist of ONLY provided text.
+    2. A strict blacklist banning fake/dummy phone numbers, emails, addresses, or icons.
+    3. An unequivocal mandate for a flat 2D graphic file with 90-degree square corners (no 3D mockup, no desk/table).
+    """
+    name = card_spec.get('name', '').strip()
+    designation = card_spec.get('designation', '').strip()
+    company = card_spec.get('company_name', '').strip()
+    phone = card_spec.get('phone', '').strip()
+    email = card_spec.get('email', '').strip()
+    address = card_spec.get('address', '').strip()
+    schedule = card_spec.get('schedule', '').strip()
+    website = card_spec.get('website', '').strip()
+    monogram = card_spec.get('monogram', '').strip() or (name[:2].upper() if name else 'ID')
+    style = card_spec.get('style_description', 'Sleek modern business card with bold typography and abstract vector accents')
+
+    # 1. Text Whitelist
+    whitelist = [f"Name: '{name}'"]
+    if designation:
+        whitelist.append(f"Title: '{designation}'")
+    if company:
+        whitelist.append(f"Company: '{company}'")
+    if phone:
+        whitelist.append(f"Phone: '{phone}' (with phone icon)")
+    if email:
+        whitelist.append(f"Email: '{email}' (with mail icon)")
+    if address:
+        whitelist.append(f"Address: '{address}' (with location pin icon)")
+    if schedule:
+        whitelist.append(f"Schedule: '{schedule}' (with clock icon)")
+    if website:
+        whitelist.append(f"Website: '{website}' (with globe icon)")
+
+    whitelist_text = ", ".join(whitelist)
+
+    # 2. Strict Blacklist for any absent fields
+    blacklist = []
+    if not phone:
+        blacklist.append("DO NOT render any phone number or phone icon (ABSOLUTELY NO +00, NO +123, NO dummy numbers)")
+    if not email:
+        blacklist.append("DO NOT render any email address or mail icon (ABSOLUTELY NO dummy@email.com)")
+    if not address:
+        blacklist.append("DO NOT render any address or location pin icon (ABSOLUTELY NO 123 Anywhere St, NO fake cities)")
+    if not designation:
+        blacklist.append("DO NOT render any job title or designation below the name")
+    if not schedule:
+        blacklist.append("DO NOT render any visiting hours or clock icon")
+    if not website:
+        blacklist.append("DO NOT render any website URL or globe icon")
+
+    blacklist_text = "; ".join(blacklist)
+
+    prompt = (
+        f"A full-bleed flat digital graphic layout, exact 1536x1024 rectangular wallpaper canvas. "
+        f"Sharp 90-degree square corners filling 100% of the entire rectangle from corner (0,0) to (1536,1024) edge-to-edge. "
+        f"{style}. "
+        f"Prominent stylish monogram emblem with initials '{monogram}'. "
+        f"EXACT TEXT TO RENDER (AND NOTHING ELSE): {whitelist_text}. "
+        f"STRICT PROHIBITIONS: {blacklist_text}. ABSOLUTELY ZERO placeholder text, dummy numbers, or fake contact info! "
+        f"CANVAS MANDATE: Edge-to-edge flat 2D digital print file filling 100% of the 1536x1024 frame with zero outer margins. "
+        f"ABSOLUTELY NO 3D mockup, NO perspective angle, NO table, NO desk, NO floor, NO shadows outside, NO rounded corners, NO background surface. The entire 1536x1024 image file IS the card surface."
+    )
+    return prompt
 
 
 def generate_dalle_card(dalle_prompt: str, api_key: str) -> bytes | None:
     """Calls OpenAI image generation model with the tailor-made creative prompt."""
     logger.info(f"Generating DALL-E image with prompt: {dalle_prompt}")
 
-    for model in ['gpt-image-1', 'chatgpt-image-latest', 'gpt-image-1.5']:
+    model_configs = [
+        ('gpt-image-1', '1536x1024'),
+        ('chatgpt-image-latest', '1536x1024'),
+        ('dall-e-3', '1792x1024'),
+    ]
+
+    for model, size in model_configs:
         try:
             payload = json.dumps({
                 'model': model,
                 'prompt': dalle_prompt,
                 'n': 1,
-                'size': '1536x1024'
+                'size': size
             }).encode()
 
             req = urllib.request.Request(
@@ -140,77 +191,87 @@ def generate_dalle_card(dalle_prompt: str, api_key: str) -> bytes | None:
                         return img_res.read()
 
         except urllib.error.HTTPError as e:
-            logger.error(f"OpenAI error model={model}: {e.code} {e.read().decode(errors='ignore')}")
+            logger.error(f"OpenAI image generation error model={model}: {e.code} {e.read().decode(errors='ignore')}")
             continue
         except Exception as e:
-            logger.error(f"OpenAI exception model={model}: {e}")
+            logger.error(f"OpenAI image generation exception model={model}: {e}")
             continue
     return None
 
 
 def auto_crop_card_surface(image_bytes: bytes) -> bytes:
     """
-    Detects if DALL-E generated a card sitting on a background / mockup desk / table,
-    and accurately crops to the card's 4 outer boundaries so that 100% of the
-    returned image is ONLY the visiting card surface with zero outer borders.
+    Outside-in boundary detection:
+    Scans from the extreme outer borders inward.
+    As soon as it crosses the outer background and detects the first edge peak
+    (the card's physical boundary line), it records the coordinate and immediately stops.
+    It NEVER scans into the interior of the card, guaranteeing 100% safety
+    for monograms, logos, and typography.
     """
     try:
         img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
         w, h = img.size
         gray = img.convert("L")
 
-        # 1. Left boundary (scan x from 2% to 22% of w)
-        best_left = 0
-        max_cnt_left = 0
-        for x in range(int(w * 0.02), int(w * 0.22), 2):
-            cnt = sum(1 for y in range(int(h * 0.25), int(h * 0.75), 2)
-                      if abs(gray.getpixel((x + 2, y)) - gray.getpixel((x - 2, y))) > 12)
-            if cnt > max_cnt_left and cnt > (h * 0.10):
-                max_cnt_left = cnt
-                best_left = x
+        y_mid_start = int(h * 0.25)
+        y_mid_end = int(h * 0.75)
+        y_samples = list(range(y_mid_start, y_mid_end, 3))
+        n_y = max(len(y_samples), 1)
 
-        # 2. Right boundary (scan x from 98% down to 78% of w)
-        best_right = w
-        max_cnt_right = 0
-        for x in range(int(w * 0.98), int(w * 0.78), -2):
-            cnt = sum(1 for y in range(int(h * 0.25), int(h * 0.75), 2)
-                      if abs(gray.getpixel((x - 2, y)) - gray.getpixel((x + 2, y))) > 12)
-            if cnt > max_cnt_right and cnt > (h * 0.10):
-                max_cnt_right = cnt
-                best_right = x
+        x_mid_start = int(w * 0.25)
+        x_mid_end = int(w * 0.75)
+        x_samples = list(range(x_mid_start, x_mid_end, 3))
+        n_x = max(len(x_samples), 1)
 
-        # 3. Top boundary (scan y from 2% to 26% of h)
-        best_top = 0
-        max_cnt_top = 0
-        for y in range(int(h * 0.02), int(h * 0.26), 2):
-            cnt = sum(1 for x in range(int(w * 0.25), int(w * 0.75), 2)
-                      if abs(gray.getpixel((x, y + 2)) - gray.getpixel((x, y - 2))) > 12)
-            if cnt > max_cnt_top and cnt > (w * 0.08):
-                max_cnt_top = cnt
-                best_top = y
+        def scan_edge(get_grad_func, start, end, step, lookahead=45, min_start=2.8):
+            hit_idx = None
+            for i in range(start, end, step):
+                if get_grad_func(i) >= min_start:
+                    hit_idx = i
+                    break
+            if hit_idx is None:
+                return None
+            limit = min(max(start, end), max(min(start, end), hit_idx + step * lookahead))
+            search_range = range(hit_idx, limit, step)
+            best_idx = hit_idx
+            best_val = get_grad_func(hit_idx)
+            for j in search_range:
+                val = get_grad_func(j)
+                if val > best_val:
+                    best_val = val
+                    best_idx = j
+            return best_idx if best_val >= 3.8 else None
 
-        # 4. Bottom boundary (scan y from 98% down to 74% of h)
-        best_bottom = h
-        max_cnt_bottom = 0
-        for y in range(int(h * 0.98), int(h * 0.74), -2):
-            cnt = sum(1 for x in range(int(w * 0.25), int(w * 0.75), 2)
-                      if abs(gray.getpixel((x, y - 2)) - gray.getpixel((x, y + 2))) > 12)
-            if cnt > max_cnt_bottom and cnt > (w * 0.08):
-                max_cnt_bottom = cnt
-                best_bottom = y
+        left_edge = scan_edge(
+            lambda x: sum(abs(gray.getpixel((x, y)) - gray.getpixel((x - 1, y))) for y in y_samples) / n_y,
+            int(w * 0.02), int(w * 0.20), 1, lookahead=45
+        )
+        right_edge = scan_edge(
+            lambda x: sum(abs(gray.getpixel((x, y)) - gray.getpixel((x - 1, y))) for y in y_samples) / n_y,
+            w - 2, int(w * 0.70), -1, lookahead=80
+        )
+        top_edge = scan_edge(
+            lambda y: sum(abs(gray.getpixel((x, y)) - gray.getpixel((x, y - 1))) for x in x_samples) / n_x,
+            int(h * 0.02), int(h * 0.20), 1, lookahead=45
+        )
+        bot_edge = scan_edge(
+            lambda y: sum(abs(gray.getpixel((x, y)) - gray.getpixel((x, y - 1))) for x in x_samples) / n_x,
+            h - 2, int(h * 0.70), -1, lookahead=160
+        )
 
-        # Apply a 3px inset inside the detected card boundary to ensure ZERO border remnant
-        c_left = best_left + 3 if best_left > 15 else 0
-        c_top = best_top + 3 if best_top > 15 else 0
-        c_right = best_right - 3 if best_right < (w - 15) else w
-        c_bottom = best_bottom - 3 if best_bottom < (h - 15) else h
+        c_left = (left_edge + 2) if left_edge is not None else 0
+        c_right = (right_edge - 2) if right_edge is not None else w
+        c_top = (top_edge + 2) if top_edge is not None else 0
+        c_bottom = (bot_edge - 2) if bot_edge is not None else h
 
-        # Validate that cropped area is realistic (at least 60% of canvas)
-        if (c_right - c_left) > int(w * 0.6) and (c_bottom - c_top) > int(h * 0.5):
-            cropped = img.crop((c_left, c_top, c_right, c_bottom))
-            buf = io.BytesIO()
-            cropped.save(buf, format="PNG", optimize=True)
-            return buf.getvalue()
+        # Verify validity: must retain at least 60% of original dimensions
+        if (c_right - c_left) >= int(w * 0.60) and (c_bottom - c_top) >= int(h * 0.60):
+            if (c_left > 0) or (c_top > 0) or (c_right < w) or (c_bottom < h):
+                logger.info(f"Auto-crop removing outer borders: left={c_left}, top={c_top}, right={c_right}, bottom={c_bottom}")
+                cropped = img.crop((c_left, c_top, c_right, c_bottom))
+                buf = io.BytesIO()
+                cropped.save(buf, format="PNG", optimize=True)
+                return buf.getvalue()
 
         return image_bytes
     except Exception as e:
@@ -221,10 +282,10 @@ def auto_crop_card_surface(image_bytes: bytes) -> bytes:
 def generate_hybrid_business_card(prompt: str) -> tuple[bytes, dict]:
     """
     Main entry point for visiting card generation:
-    1. GPT-4o-mini analyzes prompt, strictly avoids predicting missing titles,
-       extracts full address, schedule, contacts, and crafts a bespoke DALL-E prompt.
-    2. OpenAI Image Model (gpt-image-1) generates the visiting card with stunning AI aesthetics.
-    3. Auto-crop cleans any outer backdrop, guaranteeing 100% pure visiting card.
+    1. GPT-4o-mini extracts exact facts, enforces zero hallucination of missing contacts.
+    2. Constructs a bespoke prompt with whitelisted text and strict prohibitions.
+    3. OpenAI Image Model generates the flat 2D edge-to-edge card.
+    4. Auto-crop cleanly strips any outer border / backdrop while preserving logos.
     """
     api_key = (
         os.environ.get('OPENAI_API_KEY') or
@@ -252,19 +313,18 @@ def generate_hybrid_business_card(prompt: str) -> tuple[bytes, dict]:
         'linkedin':     card_spec.get('linkedin', '').strip(),
     }
 
-    dalle_prompt = card_spec.get('dalle_prompt') or (
-        f"Full-bleed visiting card design for {card_data['name']}. "
-        "Fills 100% of the 1536x1024 canvas edge-to-edge. Zero outer background, zero table."
-    )
+    dalle_prompt = card_spec.get('dalle_prompt') or build_precision_dalle_prompt(card_spec)
 
-    logger.info("Step 1: Generating full-bleed card via OpenAI image model...")
-    card_bytes = generate_dalle_card(dalle_prompt, api_key)
+    logger.info("Step 1: Generating bespoke visiting card via OpenAI image model...")
+    raw_bytes = generate_dalle_card(dalle_prompt, api_key)
 
-    if card_bytes:
-        card_bytes = auto_crop_card_surface(card_bytes)
+    if raw_bytes:
+        card_bytes = auto_crop_card_surface(raw_bytes)
         logger.info("Step 2: Successfully produced pure visiting card!")
         return card_bytes, card_data
     else:
-        logger.warning("OpenAI image generation failed. Falling back to Pillow.")
+        logger.warning("OpenAI image generation failed. Falling back to precision card drawer.")
         from .card_drawer import generate_business_card
-        return generate_business_card(card_data), card_data
+        return generate_business_card(card_spec), card_data
+
+

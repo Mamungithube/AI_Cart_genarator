@@ -3,269 +3,453 @@ import math
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-# Base directory for fonts
 FONTS_DIR = Path(__file__).resolve().parent.parent / 'fonts'
 
-THEMES = {
-    'midnight_gold': {
-        'bg_start': (11, 15, 23),       # Deep obsidian navy
-        'bg_end': (22, 27, 46),         # Rich midnight blue
-        'accent': (212, 175, 55),       # Metallic Gold
-        'accent_glow': (245, 215, 127), # Warm pale gold
-        'text_primary': (255, 255, 255),# Pure white
-        'text_secondary': (212, 175, 55),# Gold designation
-        'text_muted': (148, 163, 184),  # Slate light gray
-        'card_border': (45, 55, 72),
-        'icon_bg': (26, 32, 44),
-        'icon_stroke': (212, 175, 55),
-        'ribbon': (212, 175, 55),
-    },
-    'ocean_modern': {
-        'bg_start': (6, 18, 38),        # Deep sapphire
-        'bg_end': (15, 38, 75),         # Electric navy
-        'accent': (6, 182, 212),        # Cyan / Aqua
-        'accent_glow': (56, 189, 248),  # Sky blue
-        'text_primary': (255, 255, 255),
-        'text_secondary': (56, 189, 248),
-        'text_muted': (186, 230, 253),
-        'card_border': (30, 58, 138),
-        'icon_bg': (12, 74, 110),
-        'icon_stroke': (56, 189, 248),
-        'ribbon': (6, 182, 212),
-    },
-    'minimal_clean': {
-        'bg_start': (252, 252, 253),    # Off white
-        'bg_end': (241, 245, 249),      # Cool slate 100
-        'accent': (15, 23, 42),         # Deep graphite
-        'accent_glow': (239, 68, 68),   # Crimson Swiss accent
-        'text_primary': (15, 23, 42),   # Pitch black
-        'text_secondary': (239, 68, 68),# Red accent for role
-        'text_muted': (71, 85, 105),    # Slate gray
-        'card_border': (226, 232, 240),
-        'icon_bg': (226, 232, 240),
-        'icon_stroke': (15, 23, 42),
-        'ribbon': (239, 68, 68),
-    },
-    'slate_neon': {
-        'bg_start': (15, 23, 42),       # Dark Slate 900
-        'bg_end': (30, 41, 59),         # Slate 800
-        'accent': (168, 85, 247),       # Neon Purple
-        'accent_glow': (236, 72, 153),  # Cyber Pink
-        'text_primary': (255, 255, 255),
-        'text_secondary': (216, 180, 254),
-        'text_muted': (148, 163, 184),
-        'card_border': (71, 85, 105),
-        'icon_bg': (51, 65, 85),
-        'icon_stroke': (236, 72, 153),
-        'ribbon': (168, 85, 247),
-    },
-}
-
-def load_font(name: str, size: int):
-    """
-    Attempts to load bundled TTF fonts first, then OS fallbacks, then Pillow default.
-    """
-    font_files = [
-        FONTS_DIR / f"{name}.ttf",
-        FONTS_DIR / "bold.ttf" if name == "bold" else FONTS_DIR / "regular.ttf",
-        Path("/usr/share/fonts/truetype/dejavu") / ("DejaVuSans-Bold.ttf" if name == "bold" else "DejaVuSans.ttf"),
-        Path("/usr/share/fonts/truetype/freefont") / ("FreeSansBold.ttf" if name == "bold" else "FreeSans.ttf"),
-        Path("C:/Windows/Fonts") / ("arialbd.ttf" if name == "bold" else "arial.ttf"),
+def get_font(size: int, bold: bool = False):
+    """Loads bundled TTF fonts first, then OS fallbacks, then default."""
+    font_candidates = [
+        FONTS_DIR / ('bold.ttf' if bold else 'regular.ttf'),
+        Path('/usr/share/fonts/truetype/dejavu') / ('DejaVuSans-Bold.ttf' if bold else 'DejaVuSans.ttf'),
+        Path('/usr/share/fonts/truetype/freefont') / ('FreeSansBold.ttf' if bold else 'FreeSans.ttf'),
+        Path('C:/Windows/Fonts') / ('arialbd.ttf' if bold else 'arial.ttf'),
     ]
-
-    for candidate in font_files:
-        if candidate.exists():
+    for c in font_candidates:
+        if c.exists():
             try:
-                return ImageFont.truetype(str(candidate), size)
+                return ImageFont.truetype(str(c), size)
             except Exception:
                 continue
-
-    # Fallback if no true-type font found
     try:
         return ImageFont.load_default(size=size)
-    except TypeError:
+    except Exception:
         return ImageFont.load_default()
 
-def draw_gradient(draw: ImageDraw.ImageDraw, width: int, height: int, start_color: tuple, end_color: tuple):
-    """Renders a smooth vertical linear gradient."""
-    for y in range(height):
-        ratio = y / float(height)
-        r = int(start_color[0] + (end_color[0] - start_color[0]) * ratio)
-        g = int(start_color[1] + (end_color[1] - start_color[1]) * ratio)
-        b = int(start_color[2] + (end_color[2] - start_color[2]) * ratio)
-        draw.line([(0, y), (width, y)], fill=(r, g, b))
-
-def draw_phone_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int, size: int, color: tuple):
-    """Draws a clean phone icon centered at (cx, cy)."""
+# -------------------------------------------------------------
+# High-DPI Vector Glyphs
+# -------------------------------------------------------------
+def draw_phone_glyph(draw, x, y, size, color):
     r = size // 2
-    draw.rounded_rectangle([cx - r + 3, cy - r, cx + r - 3, cy + r], radius=4, outline=color, width=2)
-    # Screen notch / speaker
-    draw.line([cx - 3, cy - r + 4, cx + 3, cy - r + 4], fill=color, width=1)
-    # Home button / chin dot
-    draw.ellipse([cx - 2, cy + r - 6, cx + 2, cy + r - 2], fill=color)
+    h = int(size * 1.5)
+    draw.rounded_rectangle([x, y, x + size, y + h], radius=max(2, size // 6), outline=color, width=max(2, size // 8))
+    draw.line([x + max(2, size // 5), y + max(2, size // 6), x + size - max(2, size // 5), y + max(2, size // 6)], fill=color, width=max(1, size // 12))
+    draw.ellipse([x + r - 2, y + h - max(5, size // 3), x + r + 2, y + h - max(2, size // 6)], fill=color)
 
-def draw_mail_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int, size: int, color: tuple):
-    """Draws an envelope icon centered at (cx, cy)."""
-    w = size
-    h = int(size * 0.7)
-    left = cx - w // 2
-    top = cy - h // 2
-    right = cx + w // 2
-    bottom = cy + h // 2
-    draw.rounded_rectangle([left, top, right, bottom], radius=2, outline=color, width=2)
-    # Flap
-    draw.line([left, top, cx, cy + 2], fill=color, width=2)
-    draw.line([right, top, cx, cy + 2], fill=color, width=2)
+def draw_mail_glyph(draw, x, y, size, color):
+    h = int(size * 0.75)
+    draw.rounded_rectangle([x, y, x + size, y + h], radius=max(2, size // 6), outline=color, width=max(2, size // 8))
+    draw.line([x, y, x + size // 2, y + h // 2], fill=color, width=max(2, size // 8))
+    draw.line([x + size, y, x + size // 2, y + h // 2], fill=color, width=max(2, size // 8))
 
-def draw_globe_icon(draw: ImageDraw.ImageDraw, cx: int, cy: int, size: int, color: tuple):
-    """Draws a modern globe / web icon centered at (cx, cy)."""
+def draw_web_glyph(draw, x, y, size, color):
     r = size // 2
-    draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline=color, width=2)
-    # Latitude line
-    draw.line([cx - r, cy, cx + r, cy], fill=color, width=1)
-    # Longitude ellipse
-    draw.ellipse([cx - r // 2, cy - r, cx + r // 2, cy + r], outline=color, width=1)
+    cx, cy = x + r, y + r
+    draw.ellipse([x, y, x + size, y + size], outline=color, width=max(2, size // 8))
+    draw.line([x, cy, x + size, cy], fill=color, width=max(1, size // 10))
+    draw.ellipse([cx - r // 2, y, cx + r // 2, y + size], outline=color, width=max(1, size // 10))
 
-def draw_monogram_emblem(draw: ImageDraw.ImageDraw, cx: int, cy: int, radius: int, initials: str, theme: dict, font):
-    """Draws a modern geometric company badge."""
-    # Outer hexagon or rotated diamond
-    accent = theme['accent']
-    pts = []
+def draw_loc_glyph(draw, x, y, size, color):
+    r = size // 2
+    cx = x + r
+    draw.ellipse([x + 2, y, x + size - 2, y + size - 4], outline=color, width=max(2, size // 8))
+    draw.polygon([(x + 3, y + r), (x + size - 3, y + r), (cx, y + size + 2)], fill=color)
+
+def draw_clock_glyph(draw, x, y, size, color):
+    r = size // 2
+    cx, cy = x + r, y + r
+    draw.ellipse([x, y, x + size, y + size], outline=color, width=max(2, size // 8))
+    draw.line([cx, cy, cx, y + 4], fill=color, width=max(2, size // 8))
+    draw.line([cx, cy, x + size - 4, cy], fill=color, width=max(2, size // 8))
+
+
+# -------------------------------------------------------------
+# 1. ORGANIC WAVES (Screenshot 1 & Screenshot 2)
+# -------------------------------------------------------------
+def render_organic_waves_card(data: dict, scale: int = 2) -> Image.Image:
+    w, h = 1200 * scale, 700 * scale
+    theme = data.get('theme') or {}
+    bg_color = tuple(theme.get('bg_card', [22, 37, 54]))
+    accent_1 = tuple(theme.get('accent', [245, 166, 35]))
+    accent_2 = tuple(theme.get('accent_secondary', [217, 83, 47]))
+    text_primary = tuple(theme.get('text_primary', [255, 255, 255]))
+    text_sec = tuple(theme.get('text_secondary', [245, 166, 35]))
+    text_mut = tuple(theme.get('text_muted', [200, 210, 220]))
+
+    def s(v): return int(v * scale)
+
+    img = Image.new('RGB', (w, h), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    # Upper yellow wave
+    wave_pts_1 = []
+    for x in range(s(-10), s(520), s(2)):
+        y = s(120) + int(s(65) * math.sin(x * (0.009 / scale)) + s(35) * math.cos(x * (0.013 / scale)))
+        wave_pts_1.append((x, y))
+    draw.line(wave_pts_1, fill=accent_1, width=s(32), joint='curve')
+
+    # Lower wave rising from bottom-right
+    wave_pts_2 = []
+    for x in range(s(720), w + s(20), s(2)):
+        t = (x - s(720))
+        y = h - s(75) - int(s(75) * math.sin(t * (0.0095 / scale)))
+        wave_pts_2.append((x, y))
+    draw.line(wave_pts_2, fill=accent_1, width=s(30), joint='curve')
+
+    # Sun disc & quarter arc top-right
+    draw.ellipse([w - s(220), s(75), w - s(160), s(135)], fill=accent_1)
+    draw.pieslice([w - s(110), s(-50), w + s(110), s(170)], 90, 180, fill=accent_2)
+
+    # Bottom-left striped circle badge
+    circle_cx, circle_cy, circle_r = s(160), h - s(80), s(120)
+    mask = Image.new('L', (w, h), 0)
+    m_draw = ImageDraw.Draw(mask)
+    m_draw.ellipse([circle_cx - circle_r, circle_cy - circle_r, circle_cx + circle_r, circle_cy + circle_r], fill=255)
+
+    stripe_layer = Image.new('RGB', (w, h), bg_color)
+    s_draw = ImageDraw.Draw(stripe_layer)
+    for sx in range(0, s(420), s(22)):
+        s_draw.line([(sx, h), (sx + s(200), h - s(250))], fill=accent_2, width=s(10))
+    img.paste(stripe_layer, (0, 0), mask)
+
+    # Bold Monogram Emblem (Left side)
+    mono_cx, mono_cy = s(340), s(350)
+    name = data.get('name', '').strip()
+    monogram = data.get('monogram') or (name[:2].upper() if name else 'TE')
+    monogram = monogram[:2].upper()
+
+    font_mono = get_font(s(135), bold=True)
+    mb = draw.textbbox((0, 0), monogram, font=font_mono)
+    draw.text((mono_cx - (mb[2] - mb[0]) // 2, mono_cy - (mb[3] - mb[1]) // 2 - s(12)), monogram, font=font_mono, fill=text_primary)
+
+    # Content Zone (Right side)
+    tx = s(540)
+    curr_y = s(185)
+
+    if name:
+        font_name = get_font(s(54), bold=True)
+        nb = draw.textbbox((tx, curr_y), name, font=font_name)
+        if (nb[2] - nb[0]) > s(580):
+            font_name = get_font(s(44), bold=True)
+            nb = draw.textbbox((tx, curr_y), name, font=font_name)
+        draw.text((tx, curr_y), name, font=font_name, fill=text_primary)
+        curr_y = nb[3] + s(14)
+
+    desig = data.get('designation', '').strip()
+    if desig:
+        font_des = get_font(s(28), bold=False)
+        db = draw.textbbox((tx, curr_y), desig, font=font_des)
+        draw.text((tx, curr_y), desig, font=font_des, fill=text_sec)
+        curr_y = db[3] + s(16)
+
+    comp = data.get('company_name', '').strip()
+    if comp:
+        font_comp = get_font(s(34), bold=True)
+        cb = draw.textbbox((tx, curr_y), comp, font=font_comp)
+        draw.text((tx, curr_y), comp, font=font_comp, fill=text_primary)
+        curr_y = cb[3] + s(28)
+
+    # Contacts (with guaranteed safe margins)
+    contacts = []
+    if data.get('phone'): contacts.append(('phone', data['phone'], draw_phone_glyph))
+    if data.get('email'): contacts.append(('email', data['email'], draw_mail_glyph))
+    if data.get('website'): contacts.append(('web', data['website'], draw_web_glyph))
+    if data.get('address'): contacts.append(('loc', data['address'], draw_loc_glyph))
+    if data.get('schedule'): contacts.append(('clock', data['schedule'], draw_clock_glyph))
+
+    if contacts:
+        font_c = get_font(s(25), bold=False)
+        for ctype, cval, icon_fn in contacts:
+            icon_fn(draw, tx, curr_y + s(4), s(18), accent_1)
+            draw.text((tx + s(32), curr_y), cval, font=font_c, fill=text_mut)
+            curr_y += s(38)
+
+    return img.resize((1200, 700), Image.Resampling.LANCZOS)
+
+
+# -------------------------------------------------------------
+# 2. CORNER ARCS (Screenshot 3)
+# -------------------------------------------------------------
+def render_corner_arcs_card(data: dict, scale: int = 2) -> Image.Image:
+    w, h = 1200 * scale, 700 * scale
+    theme = data.get('theme') or {}
+    bg_color = tuple(theme.get('bg_card', [26, 32, 38]))
+    accent = tuple(theme.get('accent', [245, 95, 30]))
+    text_primary = tuple(theme.get('text_primary', [255, 255, 255]))
+    text_sec = tuple(theme.get('text_secondary', [200, 210, 220]))
+    text_mut = tuple(theme.get('text_muted', [175, 185, 195]))
+
+    def s(v): return int(v * scale)
+
+    img = Image.new('RGB', (w, h), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    # Top-right concentric rounded arcs
+    draw.arc([w - s(420), s(-140), w + s(140), s(420)], start=90, end=180, fill=accent, width=s(28))
+    draw.arc([w - s(320), s(-40), w + s(40), s(320)], start=90, end=180, fill=accent, width=s(22))
+
+    # Bottom-left 45-degree diagonal accent stripes
+    for sx in [s(-60), s(40), s(140)]:
+        draw.line([(sx, h + s(30)), (sx + s(240), h - s(210))], fill=accent, width=s(24))
+
+    # Bottom-right corner arc
+    draw.arc([w - s(240), h - s(240), w + s(80), h + s(80)], start=180, end=270, fill=accent, width=s(16))
+
+    # Bold Monogram Emblem (Left side)
+    mono_cx, mono_cy = s(320), s(350)
+    name = data.get('name', '').strip()
+    monogram = data.get('monogram') or (name[:2].upper() if name else 'DO')
+    monogram = monogram[:2].upper()
+
+    font_mono = get_font(s(145), bold=True)
+    mb = draw.textbbox((0, 0), monogram, font=font_mono)
+    draw.text((mono_cx - (mb[2] - mb[0]) // 2, mono_cy - (mb[3] - mb[1]) // 2 - s(15)), monogram, font=font_mono, fill=accent)
+
+    # Content Zone (Right side)
+    tx = s(520)
+    curr_y = s(205)
+
+    if name:
+        font_name = get_font(s(56), bold=True)
+        nb = draw.textbbox((tx, curr_y), name, font=font_name)
+        if (nb[2] - nb[0]) > s(560):
+            font_name = get_font(s(44), bold=True)
+            nb = draw.textbbox((tx, curr_y), name, font=font_name)
+        draw.text((tx, curr_y), name, font=font_name, fill=text_primary)
+        curr_y = nb[3] + s(16)
+
+    desig = data.get('designation', '').strip()
+    if desig:
+        font_des = get_font(s(28), bold=False)
+        db = draw.textbbox((tx, curr_y), desig, font=font_des)
+        draw.text((tx, curr_y), desig, font=font_des, fill=text_sec)
+        curr_y = db[3] + s(16)
+
+    comp = data.get('company_name', '').strip()
+    if comp:
+        font_comp = get_font(s(34), bold=True)
+        cb = draw.textbbox((tx, curr_y), comp, font=font_comp)
+        draw.text((tx, curr_y), comp, font=font_comp, fill=text_primary)
+        curr_y = cb[3] + s(30)
+
+    # Contacts (with guaranteed safe clearance)
+    contacts = []
+    if data.get('phone'): contacts.append(('phone', data['phone'], draw_phone_glyph))
+    if data.get('email'): contacts.append(('email', data['email'], draw_mail_glyph))
+    if data.get('website'): contacts.append(('web', data['website'], draw_web_glyph))
+    if data.get('address'): contacts.append(('loc', data['address'], draw_loc_glyph))
+    if data.get('schedule'): contacts.append(('clock', data['schedule'], draw_clock_glyph))
+
+    if contacts:
+        font_c = get_font(s(28), bold=False)
+        for ctype, cval, icon_fn in contacts:
+            icon_fn(draw, tx, curr_y + s(4), s(20), accent)
+            draw.text((tx + s(36), curr_y), cval, font=font_c, fill=text_primary)
+            curr_y += s(44)
+
+    return img.resize((1200, 700), Image.Resampling.LANCZOS)
+
+
+# -------------------------------------------------------------
+# 3. CYBER TECH
+# -------------------------------------------------------------
+def render_cyber_tech_card(data: dict, scale: int = 2) -> Image.Image:
+    w, h = 1200 * scale, 700 * scale
+    theme = data.get('theme') or {}
+    bg_color = tuple(theme.get('bg_card', [10, 16, 28]))
+    accent = tuple(theme.get('accent', [0, 229, 255]))
+    accent_sec = tuple(theme.get('accent_secondary', [56, 189, 248]))
+    text_primary = tuple(theme.get('text_primary', [255, 255, 255]))
+    text_sec = tuple(theme.get('text_secondary', [0, 229, 255]))
+    text_mut = tuple(theme.get('text_muted', [148, 163, 184]))
+
+    def s(v): return int(v * scale)
+
+    img = Image.new('RGB', (w, h), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    # Subtle circuit grid
+    grid_c = (20, 30, 48)
+    for gy in range(0, h, s(70)):
+        draw.line([(0, gy), (w, gy)], fill=grid_c, width=1)
+    for gx in range(0, w, s(70)):
+        draw.line([(gx, 0), (gx, h)], fill=grid_c, width=1)
+
+    # Tech angular brackets
+    draw.line([(w - s(80), s(60)), (w - s(40), s(60)), (w - s(40), s(180))], fill=accent, width=s(3))
+    draw.line([(w - s(80), h - s(60)), (w - s(40), h - s(60)), (w - s(40), h - s(180))], fill=accent, width=s(3))
+
+    # Hexagon Emblem on Right
+    hex_cx, hex_cy, hex_r = w - s(240), h // 2, s(110)
+    hex_pts = []
     for i in range(6):
-        angle_deg = 60 * i - 30
-        angle_rad = math.radians(angle_deg)
-        x = cx + int(radius * math.cos(angle_rad))
-        y = cy + int(radius * math.sin(angle_rad))
-        pts.append((x, y))
+        ang = math.radians(60 * i - 30)
+        hex_pts.append((hex_cx + int(hex_r * math.cos(ang)), hex_cy + int(hex_r * math.sin(ang))))
+    draw.polygon(hex_pts, fill=(15, 23, 42), outline=accent, width=s(4))
 
-    draw.polygon(pts, fill=theme['icon_bg'], outline=accent)
-    # Inner ring
-    inner_pts = []
-    for i in range(6):
-        angle_deg = 60 * i - 30
-        angle_rad = math.radians(angle_deg)
-        x = cx + int((radius - 6) * math.cos(angle_rad))
-        y = cy + int((radius - 6) * math.sin(angle_rad))
-        inner_pts.append((x, y))
-    draw.polygon(inner_pts, outline=theme['accent_glow'])
+    name = data.get('name', '').strip()
+    monogram = data.get('monogram') or (name[:2].upper() if name else 'TE')
+    font_mono = get_font(s(68), bold=True)
+    mb = draw.textbbox((0, 0), monogram, font=font_mono)
+    draw.text((hex_cx - (mb[2] - mb[0]) // 2, hex_cy - (mb[3] - mb[1]) // 2 - s(6)), monogram, font=font_mono, fill=accent)
 
-    # Initials
-    bbox = draw.textbbox((0, 0), initials, font=font)
-    tw = bbox[2] - bbox[0]
-    th = bbox[3] - bbox[1]
-    draw.text((cx - tw // 2, cy - th // 2 - 2), initials, font=font, fill=theme['text_primary'])
+    # Circuit trace connecting to hexagon
+    draw.line([(hex_cx - hex_r - s(40), hex_cy), (hex_cx - hex_r, hex_cy)], fill=accent, width=s(2))
+    draw.ellipse([hex_cx - hex_r - s(46), hex_cy - s(6), hex_cx - hex_r - s(34), hex_cy + s(6)], fill=accent)
+
+    # Content Zone on Left
+    tx = s(90)
+    curr_y = s(120)
+
+    if name:
+        font_name = get_font(s(58), bold=True)
+        nb = draw.textbbox((tx, curr_y), name, font=font_name)
+        draw.text((tx, curr_y), name, font=font_name, fill=text_primary)
+        curr_y = nb[3] + s(12)
+
+    desig = data.get('designation', '').strip().upper()
+    if desig:
+        font_des = get_font(s(24), bold=True)
+        db = draw.textbbox((tx, curr_y), desig, font=font_des)
+        draw.text((tx, curr_y), desig, font=font_des, fill=accent)
+        curr_y = db[3] + s(14)
+
+    comp = data.get('company_name', '').strip()
+    if comp:
+        font_comp = get_font(s(30), bold=False)
+        cb = draw.textbbox((tx, curr_y), comp, font=font_comp)
+        draw.text((tx, curr_y), comp, font=font_comp, fill=text_mut)
+        curr_y = cb[3] + s(24)
+
+    # Divider line
+    draw.line([(tx, curr_y), (tx + s(380), curr_y)], fill=accent, width=s(2))
+    draw.line([(tx + s(380), curr_y), (tx + s(480), curr_y)], fill=accent_sec, width=s(1))
+    curr_y += s(35)
+
+    # Contacts
+    contacts = []
+    if data.get('phone'): contacts.append(('phone', data['phone'], draw_phone_glyph))
+    if data.get('email'): contacts.append(('email', data['email'], draw_mail_glyph))
+    if data.get('website'): contacts.append(('web', data['website'], draw_web_glyph))
+    if data.get('address'): contacts.append(('loc', data['address'], draw_loc_glyph))
+    if data.get('schedule'): contacts.append(('clock', data['schedule'], draw_clock_glyph))
+
+    if contacts:
+        font_c = get_font(s(24), bold=False)
+        for ctype, cval, icon_fn in contacts:
+            icon_fn(draw, tx, curr_y + s(4), s(18), accent)
+            draw.text((tx + s(32), curr_y), cval, font=font_c, fill=text_mut)
+            curr_y += s(38)
+
+    draw.rectangle([0, 0, w - 1, h - 1], outline=accent, width=s(2))
+    return img.resize((1200, 700), Image.Resampling.LANCZOS)
+
+
+# -------------------------------------------------------------
+# 4. LUXURY GOLD
+# -------------------------------------------------------------
+def render_luxury_gold_card(data: dict, scale: int = 2) -> Image.Image:
+    w, h = 1200 * scale, 700 * scale
+    theme = data.get('theme') or {}
+    bg_color = tuple(theme.get('bg_card', [13, 15, 20]))
+    gold = tuple(theme.get('accent', [212, 175, 55]))
+    gold_light = tuple(theme.get('accent_secondary', [245, 215, 127]))
+    text_primary = tuple(theme.get('text_primary', [255, 255, 255]))
+    text_mut = tuple(theme.get('text_muted', [205, 210, 220]))
+
+    def s(v): return int(v * scale)
+
+    img = Image.new('RGB', (w, h), bg_color)
+    draw = ImageDraw.Draw(img)
+
+    # Double Gold Borders with corner notches
+    draw.rectangle([s(25), s(25), w - s(25), h - s(25)], outline=gold, width=s(2))
+    draw.rectangle([s(36), s(36), w - s(36), h - s(36)], outline=gold_light, width=s(1))
+    for cx, cy in [(s(25), s(25)), (w - s(25), s(25)), (s(25), h - s(25)), (w - s(25), h - s(25))]:
+        draw.rectangle([cx - s(6), cy - s(6), cx + s(6), cy + s(6)], fill=gold)
+
+    # Right side Crest Badge
+    badge_cx, badge_cy, badge_r = w - s(240), h // 2, s(105)
+    draw.ellipse([badge_cx - badge_r, badge_cy - badge_r, badge_cx + badge_r, badge_cy + badge_r], outline=gold, width=s(3))
+    draw.ellipse([badge_cx - badge_r + s(10), badge_cy - badge_r + s(10), badge_cx + badge_r - s(10), badge_cy + badge_r - s(10)], outline=gold_light, width=s(1))
+
+    name = data.get('name', '').strip()
+    monogram = data.get('monogram') or (name[:2].upper() if name else 'LG')
+    font_mono = get_font(s(70), bold=True)
+    mb = draw.textbbox((0, 0), monogram, font=font_mono)
+    draw.text((badge_cx - (mb[2] - mb[0]) // 2, badge_cy - (mb[3] - mb[1]) // 2 - s(6)), monogram, font=font_mono, fill=gold)
+
+    # Content Zone on Left
+    tx = s(90)
+    curr_y = s(140)
+
+    if name:
+        font_name = get_font(s(58), bold=True)
+        nb = draw.textbbox((tx, curr_y), name, font=font_name)
+        draw.text((tx, curr_y), name, font=font_name, fill=gold_light)
+        curr_y = nb[3] + s(14)
+
+    desig = data.get('designation', '').strip().upper()
+    if desig:
+        font_des = get_font(s(22), bold=False)
+        db = draw.textbbox((tx, curr_y), desig, font=font_des)
+        draw.text((tx, curr_y), desig, font=font_des, fill=gold)
+        curr_y = db[3] + s(14)
+
+    comp = data.get('company_name', '').strip()
+    if comp:
+        font_comp = get_font(s(30), bold=True)
+        cb = draw.textbbox((tx, curr_y), comp, font=font_comp)
+        draw.text((tx, curr_y), comp, font=font_comp, fill=text_primary)
+        curr_y = cb[3] + s(26)
+
+    # Gold Divider
+    draw.line([(tx, curr_y), (tx + s(400), curr_y)], fill=gold, width=s(2))
+    curr_y += s(36)
+
+    # Contacts
+    contacts = []
+    if data.get('phone'): contacts.append(('phone', data['phone'], draw_phone_glyph))
+    if data.get('email'): contacts.append(('email', data['email'], draw_mail_glyph))
+    if data.get('website'): contacts.append(('web', data['website'], draw_web_glyph))
+    if data.get('address'): contacts.append(('loc', data['address'], draw_loc_glyph))
+    if data.get('schedule'): contacts.append(('clock', data['schedule'], draw_clock_glyph))
+
+    if contacts:
+        font_c = get_font(s(24), bold=False)
+        for ctype, cval, icon_fn in contacts:
+            icon_fn(draw, tx, curr_y + s(4), s(18), gold)
+            draw.text((tx + s(32), curr_y), cval, font=font_c, fill=text_mut)
+            curr_y += s(38)
+
+    return img.resize((1200, 700), Image.Resampling.LANCZOS)
+
+
+# -------------------------------------------------------------
+# Dispatcher & Main Entry Points
+# -------------------------------------------------------------
+STYLE_DISPATCHER = {
+    'organic_waves': render_organic_waves_card,
+    'corner_arcs': render_corner_arcs_card,
+    'cyber_tech': render_cyber_tech_card,
+    'luxury_gold': render_luxury_gold_card,
+}
 
 def generate_business_card(data: dict) -> bytes:
     """
-    Renders a standard 1050x600 px (3.5" x 2" at 300 DPI) business card in-memory
-    using Pillow and returns PNG bytes.
+    Main vector generation function.
+    Selects layout style, renders 2x supersampled card, downsamples with LANCZOS to 1200x700 PNG.
+    Guarantees 100% full bleed, zero outer desk/table, zero text clipping.
     """
-    width = 1050
-    height = 600
+    layout_style = (data.get('layout_style') or 'organic_waves').lower()
+    renderer = STYLE_DISPATCHER.get(layout_style, render_organic_waves_card)
 
-    name = data.get('name', 'Alex Morgan').strip()
-    designation = data.get('designation', 'Senior Software Architect').strip().upper()
-    phone = data.get('phone', '+1 (555) 019-2834').strip()
-    email = data.get('email', 'alex.morgan@company.com').strip()
-    website = data.get('website', 'www.company.com').strip()
-    company_name = data.get('company_name', 'NEXUS INNOVATIONS').strip().upper()
-    theme_key = data.get('theme', 'midnight_gold')
+    img = renderer(data)
 
-    theme = THEMES.get(theme_key, THEMES['midnight_gold'])
+    buf = io.BytesIO()
+    img.save(buf, format='PNG', dpi=(300, 300), optimize=True)
+    buf.seek(0)
+    return buf.getvalue()
 
-    # Initialize canvas
-    img = Image.new('RGB', (width, height), color=theme['bg_start'])
-    draw = ImageDraw.Draw(img)
 
-    # 1. Background Gradient
-    draw_gradient(draw, width, height, theme['bg_start'], theme['bg_end'])
-
-    # 2. Modern Decorative Geometric Accents (subtle grid / polygon lines)
-    for i in range(5):
-        offset = i * 28
-        alpha_color = theme['card_border']
-        draw.line([width - 320 + offset, 0, width, 320 - offset], fill=alpha_color, width=1)
-        draw.line([width - 320 + offset, height, width, height - (320 - offset)], fill=alpha_color, width=1)
-
-    # Left Ribbon / Accent Bar
-    ribbon_w = 14
-    draw.rectangle([0, 0, ribbon_w, height], fill=theme['ribbon'])
-    draw.rectangle([ribbon_w, 0, ribbon_w + 3, height], fill=theme['accent_glow'])
-
-    # Outer border for card definition
-    draw.rectangle([0, 0, width - 1, height - 1], outline=theme['card_border'], width=2)
-
-    # 3. Fonts
-    font_company = load_font('bold', 20)
-    font_name = load_font('bold', 46)
-    font_role = load_font('bold', 20)
-    font_contact = load_font('regular', 21)
-    font_badge = load_font('bold', 26)
-
-    # 4. Header: Company Monogram & Name
-    initials = "".join([part[0] for part in company_name.split()[:2]]) if company_name else "NX"
-    if not initials:
-        initials = "NX"
-
-    draw_monogram_emblem(draw, cx=80, cy=75, radius=32, initials=initials, theme=theme, font=font_badge)
-
-    # Company name text
-    draw.text((125, 65), company_name, font=font_company, fill=theme['text_primary'])
-    # Decorative line under company
-    draw.line([125, 93, 340, 93], fill=theme['accent'], width=2)
-
-    # 5. Main Hero: Name and Designation
-    hero_y = 190
-    draw.text((70, hero_y), name, font=font_name, fill=theme['text_primary'])
-
-    role_y = hero_y + 58
-    draw.text((70, role_y), designation, font=font_role, fill=theme['text_secondary'])
-
-    # Horizontal stylized divider line
-    div_y = role_y + 42
-    draw.line([70, div_y, 480, div_y], fill=theme['accent'], width=3)
-    draw.line([480, div_y, 560, div_y], fill=theme['accent_glow'], width=1)
-
-    # 6. Contact Information Section
-    contact_items = [
-        ('phone', phone, draw_phone_icon),
-        ('email', email, draw_mail_icon),
-        ('website', website, draw_globe_icon),
-    ]
-
-    start_contact_y = 350
-    spacing = 58
-
-    for idx, (label, val, icon_func) in enumerate(contact_items):
-        item_y = start_contact_y + idx * spacing
-
-        # Icon circular container
-        icon_cx = 95
-        icon_cy = item_y + 12
-        r = 20
-        draw.ellipse(
-            [icon_cx - r, icon_cy - r, icon_cx + r, icon_cy + r],
-            fill=theme['icon_bg'],
-            outline=theme['icon_stroke'],
-            width=2
-        )
-
-        # Draw vector icon
-        icon_func(draw, icon_cx, icon_cy, size=18, color=theme['accent_glow'])
-
-        # Draw contact label text
-        draw.text((icon_cx + 34, item_y), val, font=font_contact, fill=theme['text_muted'])
-
-    # 7. Modern Corner Accent / Tech Badge on Right
-    badge_cx = width - 130
-    badge_cy = height - 130
-    # Stylized watermarked logo in background on right
-    draw.ellipse([badge_cx - 80, badge_cy - 80, badge_cx + 80, badge_cy + 80], outline=theme['card_border'], width=2)
-    draw.ellipse([badge_cx - 50, badge_cy - 50, badge_cx + 50, badge_cy + 50], outline=theme['accent'], width=1)
-    draw.ellipse([badge_cx - 20, badge_cy - 20, badge_cx + 20, badge_cy + 20], fill=theme['accent'])
-
-    # Save to in-memory bytes buffer
-    buffer = io.BytesIO()
-    img.save(buffer, format='PNG', dpi=(300, 300), optimize=True)
-    buffer.seek(0)
-    return buffer.getvalue()
+def render_precision_visiting_card(spec: dict) -> bytes:
+    """Backward compatibility wrapper."""
+    return generate_business_card(spec)

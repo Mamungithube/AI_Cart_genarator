@@ -31,6 +31,7 @@ INSTALLED_APPS = [
 
     # Local apps
     'generator.apps.GeneratorConfig',
+    'image_processor.apps.ImageProcessorConfig',
 ]
 
 MIDDLEWARE = [
