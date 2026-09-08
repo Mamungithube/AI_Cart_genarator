@@ -5,7 +5,7 @@ import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from card_project.permissions import HasAPIKey
 
 from .services.cropper import crop_business_card
 from .services.enhancer import enhance_card_image
@@ -31,7 +31,7 @@ class ProcessCardView(APIView):
            "back_image_base64": "..."
          }
     """
-    permission_classes = [AllowAny]
+    permission_classes = [HasAPIKey]
 
     def post(self, request, *args, **kwargs):
         front_file = request.FILES.get('front')
@@ -50,11 +50,8 @@ class ProcessCardView(APIView):
             os.environ.get('GOOGLE_VISION_API_KEY') or ''
         ).strip().strip('"').strip("'")
 
-        openai_api_key = (
-            os.environ.get('OPENAI_API_KEY') or
-            os.environ.get('Open_AI_Key') or
-            ''
-        ).strip()
+        from card_project.key_manager import get_active_openai_key
+        openai_api_key = get_active_openai_key()
 
         try:
             # 1. Crop cards from photo
@@ -105,7 +102,7 @@ class EnhanceCardView(APIView):
     Enhances card image: 2x upscales, removes shadows, boosts contrast, whitens background, and sharpens text.
     Returns: { "success": true, "enhanced_image_base64": "..." }
     """
-    permission_classes = [AllowAny]
+    permission_classes = [HasAPIKey]
 
     def post(self, request, *args, **kwargs):
         image_file = request.FILES.get('image')

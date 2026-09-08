@@ -1,4 +1,5 @@
 import io
+import os
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
@@ -20,8 +21,16 @@ def _create_test_image():
 class ImageProcessorAPITests(TestCase):
     def setUp(self):
         self.client = APIClient()
+        self.api_key = os.environ.get('API_SECRET_KEY', '')
+        self.client.credentials(HTTP_X_API_KEY=self.api_key)
         self.process_url = reverse('api-process-card')
         self.enhance_url = reverse('api-enhance-card')
+
+    def test_unauthorized_without_api_key(self):
+        """Request without API key must be blocked with 403."""
+        unauth_client = APIClient()
+        response = unauth_client.post(self.process_url, data={})
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_process_card_empty_returns_400(self):
         """Empty request without front or back must return 400."""

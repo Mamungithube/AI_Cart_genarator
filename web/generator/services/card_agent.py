@@ -1,5 +1,6 @@
 import os
 import io
+import re
 import json
 import base64
 import logging
@@ -26,8 +27,13 @@ You will receive:
 
 YOUR TASK & CORE RULES:
 
-0. INITIAL CARD CREATION (TURN 1):
-   - By default, set "layout_style" to "organic_waves" (fluid organic ribbons & warm gold/navy aesthetic) unless the user specifically asks for another style.
+0. INITIAL CARD CREATION (TURN 1 - WHEN CURRENT_CARD_STATE IS EMPTY):
+   - Intelligently select the best-matching flagship layout style based on profession, industry, company, or prompt context:
+     * TECH / SOFTWARE / ENGINEERING / IT / DEVELOPER / DATA / DEV: Choose "cyber_tech" (circuit traces, glowing neon cyan badge).
+     * EXECUTIVE / FOUNDER / CEO / LUXURY / FINANCE / LEGAL / WEALTH: Choose "luxury_gold" (hairline gold borders, luxury crest).
+     * CREATIVE / DESIGN / ART / PHOTO / MARKETING / FOOD: Choose "organic_waves" (fluid organic ribbons, warm gold/navy).
+     * CORPORATE / CONSULTANT / AGENCY / ARCHITECT / BUSINESS / MEDICAL: Choose "corner_arcs" (bold concentric geometric arcs).
+   - If profession or industry is not clearly specified, choose creatively among the 4 styles so new cards are diverse and never repetitive duplicates!
 
 1. CRITICAL RULE: DESIGN STABILITY ON TEXT EDITS (DO NOT CHANGE DESIGN RANDOMLY!):
    - When a user updates text fields (e.g. "change name to Dodul ch.", "add phone 012555555555", "change designation", "add email"):
@@ -205,19 +211,31 @@ def detect_rollback_intent(text: str) -> bool:
     return any(k in t for k in rollback_keywords)
 
 
+def get_next_fresh_layout_style(last_style: str | None = None) -> str:
+    """
+    Guarantees that every newly initiated card session (without session_id)
+    uses a DIFFERENT design from the previous card, so consecutive cards are never identical.
+    """
+    available_styles = ['organic_waves', 'cyber_tech', 'luxury_gold', 'corner_arcs']
+    if last_style and last_style in available_styles:
+        next_idx = (available_styles.index(last_style) + 1) % len(available_styles)
+        return available_styles[next_idx]
+    return 'luxury_gold'
+
+
 def process_card_agent_turn(session_id: str | None, user_message: str, request=None) -> dict:
     """
     Main entry point for conversational agentic card design.
     Handles session retrieval, LLM design reasoning, precision vector rendering, and storage.
     """
-    api_key = (
-        os.environ.get('OPENAI_API_KEY') or
-        os.environ.get('Open_AI_Key') or
-        ''
-    ).strip()
+    from card_project.key_manager import get_active_openai_key
+    api_key = get_active_openai_key()
 
     # 1. Retrieve or Create Session
     session = None
+    is_new_session = False
+    last_system_style = None
+
     if session_id:
         try:
             session = CardSession.objects.filter(id=session_id).first()
@@ -225,10 +243,16 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
             session = None
 
     if not session:
+        last_sess = CardSession.objects.order_by('-created_at').first()
+        if last_sess and last_sess.current_state:
+            last_system_style = last_sess.current_state.get('layout_style')
+
         session = CardSession.objects.create(current_state={}, version=1)
         version = 1
+        is_new_session = True
     else:
         version = session.version + 1
+        is_new_session = False
 
     current_state = session.current_state or {}
 
@@ -273,13 +297,12 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
     explicit_style = detect_style_intent(user_message)
     is_rollback = detect_rollback_intent(user_message)
 
-    if is_rollback:
-        # Rollback intent detected
+    if is_rollback and not is_new_session:
+        # Rollback intent detected in ongoing session
         if explicit_style:
             updated_state['layout_style'] = explicit_style
             updated_state['theme'] = DEFAULT_THEMES.get(explicit_style, DEFAULT_THEMES['organic_waves'])
         else:
-            # Look backwards in history for a previous distinct style
             restored = False
             for m in history_messages:
                 prev_data = m.card_data or {}
@@ -294,17 +317,21 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
                 updated_state['layout_style'] = 'organic_waves'
                 updated_state['theme'] = DEFAULT_THEMES['organic_waves']
     elif explicit_style:
-        # Explicit style change requested
+        # Explicit style change requested by user
         updated_state['layout_style'] = explicit_style
         if not updated_state.get('theme') or updated_state.get('theme') == current_state.get('theme'):
             updated_state['theme'] = DEFAULT_THEMES.get(explicit_style, DEFAULT_THEMES['corner_arcs'])
+    elif is_new_session:
+        # BRAND NEW CARD (No session_id passed):
+        # Guarantee a DIFFERENT design from the last card!
+        chosen_style = get_next_fresh_layout_style(last_style=last_system_style)
+        updated_state['layout_style'] = chosen_style
+        updated_state['theme'] = DEFAULT_THEMES.get(chosen_style, DEFAULT_THEMES['luxury_gold'])
     else:
-        # Text update only: Strictly preserve existing style & theme
+        # ONGOING SESSION (session_id passed):
+        # Strictly preserve the user's established design on text/phone/name edits
         if current_state.get('layout_style'):
             updated_state['layout_style'] = current_state['layout_style']
-        elif not updated_state.get('layout_style'):
-            updated_state['layout_style'] = 'organic_waves'
-
         if current_state.get('theme'):
             updated_state['theme'] = current_state['theme']
         elif not updated_state.get('theme'):
@@ -368,5 +395,4 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
         "version": version,
         "assistant_message": assistant_message,
         "image_url": image_url,
-        "card_data": updated_state,
     }

@@ -69,3 +69,25 @@ class CardMessage(models.Model):
     def __str__(self):
         return f"[{self.role}] {self.content[:50]} (v{self.version})"
 
+
+class OpenAIKeyConfig(models.Model):
+    """
+    Stores AES-256 encrypted OpenAI API Key in the database.
+    Allows clients to rotate/change API key dynamically without redeploying containers.
+    """
+    encrypted_key = models.TextField(help_text="AES-256 Fernet authenticated ciphertext")
+    key_hash = models.CharField(max_length=64, blank=True, help_text="SHA-256 hash fingerprint")
+    masked_key = models.CharField(max_length=32, blank=True, help_text="Safe masked preview e.g. sk-proj...1234")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+        verbose_name = 'OpenAI Key Configuration'
+        verbose_name_plural = 'OpenAI Key Configurations'
+
+    def __str__(self):
+        status = "Active" if self.is_active else "Inactive"
+        return f"OpenAI Key ({self.masked_key}) - {status}"
+

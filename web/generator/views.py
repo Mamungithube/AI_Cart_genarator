@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
+from card_project.permissions import HasAPIKey
 from .serializers import CardPromptSerializer, CardChatSerializer
 from .models import GeneratedCard, CardSession, CardMessage
 from .services.ai_card_drawer import generate_hybrid_business_card
@@ -31,7 +32,7 @@ class CardChatAPIView(APIView):
         "image_url": "/media/cards/card_..._v1.png",
       }
     """
-    permission_classes = [AllowAny]
+    permission_classes = [HasAPIKey]
 
     def post(self, request, *args, **kwargs):
         serializer = CardChatSerializer(data=request.data)
@@ -49,7 +50,7 @@ class CardSessionHistoryAPIView(APIView):
     Retrieves full message history and past versions of a design session.
     GET /api/chat-card/<uuid:session_id>/
     """
-    permission_classes = [AllowAny]
+    permission_classes = [HasAPIKey]
 
     def get(self, request, session_id, *args, **kwargs):
         session = CardSession.objects.filter(id=session_id).first()
@@ -88,7 +89,7 @@ class GenerateCardAPIView(APIView):
 
     Response: PNG image (binary)
     """
-    permission_classes = [AllowAny]
+    permission_classes = [HasAPIKey]
 
     def _generate_and_respond(self, prompt: str):
         """Shared logic for GET and POST."""
@@ -152,4 +153,73 @@ class HealthCheckView(APIView):
         }, status=200)
 
 
+class OpenAIKeyConfigAPIView(APIView):
+    """
+    Secure management endpoint for the OpenAI API Key.
+    Stores the key with AES-256 Fernet authenticated encryption in the database.
+    Allows clients to dynamically rotate/change the OpenAI key via API.
 
+    Protected by HasAPIKey (requires valid X-API-KEY header, Bearer token, or query param).
+    """
+    permission_classes = [HasAPIKey]
+
+    def get(self, request, *args, **kwargs):
+        from card_project.key_manager import get_openai_key_metadata
+        metadata = get_openai_key_metadata()
+        return Response({
+            "success": True,
+            **metadata
+        }, status=status.HTTP_200_OK)
+
+    def post(self, request, *args, **kwargs):
+        return self._update_key(request)
+
+    def put(self, request, *args, **kwargs):
+        return self._update_key(request)
+
+    def _update_key(self, request):
+        from card_project.key_manager import (
+            set_active_openai_key,
+            validate_openai_key_live,
+        )
+        api_key = request.data.get('api_key') or request.data.get('openai_api_key')
+        if not api_key or not isinstance(api_key, str) or not api_key.strip():
+            return Response({
+                "success": False,
+                "error": "The 'api_key' field is required and cannot be empty."
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        api_key = api_key.strip()
+        do_validate = request.data.get('validate', True)
+
+        if do_validate:
+            is_valid, validation_msg = validate_openai_key_live(api_key)
+            if not is_valid:
+                return Response({
+                    "success": False,
+                    "error": validation_msg
+                }, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            validation_msg = "Live validation skipped."
+
+        config = set_active_openai_key(api_key)
+
+        return Response({
+            "success": True,
+            "message": "OpenAI API key encrypted (AES-256) and saved successfully in database.",
+            "masked_key": config.masked_key,
+            "source": "database",
+            "validation_status": validation_msg,
+            "updated_at": config.updated_at.isoformat() if config.updated_at else None
+        }, status=status.HTTP_200_OK)
+
+    def delete(self, request, *args, **kwargs):
+        from card_project.key_manager import clear_active_openai_key, get_openai_key_metadata
+        deleted_count = clear_active_openai_key()
+        metadata = get_openai_key_metadata()
+        return Response({
+            "success": True,
+            "message": "Database OpenAI key cleared. System reverted to environment default.",
+            "records_removed": deleted_count,
+            "current_status": metadata
+        }, status=status.HTTP_200_OK)

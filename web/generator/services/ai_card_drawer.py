@@ -287,11 +287,8 @@ def generate_hybrid_business_card(prompt: str) -> tuple[bytes, dict]:
     3. OpenAI Image Model generates the flat 2D edge-to-edge card.
     4. Auto-crop cleanly strips any outer border / backdrop while preserving logos.
     """
-    api_key = (
-        os.environ.get('OPENAI_API_KEY') or
-        os.environ.get('Open_AI_Key') or
-        ''
-    ).strip()
+    from card_project.key_manager import get_active_openai_key
+    api_key = get_active_openai_key()
 
     if not api_key:
         logger.warning("OPENAI_API_KEY missing. Using fallback card.")

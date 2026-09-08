@@ -87,9 +87,29 @@ docker compose ps
 ```
 All three containers (`drf_card_db`, `drf_card_web`, `drf_card_nginx`) should report healthy status.
 
+## 🔒 API Authentication & Security
+
+All visiting card generation and image processing endpoints are protected by a fixed API Key (`API_SECRET_KEY`) to prevent unauthorized public access and prevent API bill abuse:
+
+- **Configured in**: `.env` as `API_SECRET_KEY`
+- **Supported Header**: `X-API-KEY: <your-key>` or `X-API-Key: <your-key>`
+- **Supported Authorization**: `Authorization: Bearer <your-key>`
+- **Supported Query Param**: `?api_key=<your-key>` (useful for GET image requests)
+- **Public Exemptions**: `GET /api/health/` remains open for container orchestration health checks.
+
+Requests without a valid key are immediately blocked with `401 Unauthorized` / `403 Forbidden`:
+```json
+{
+  "success": false,
+  "error": "Authentication failed: Missing API Key. Provide via 'X-API-KEY' header or 'Authorization: Bearer <key>'."
+}
+```
+
 ---
 
 ## 📡 API Endpoints
+
+All protected endpoints require the `X-API-KEY` header.
 
 ### 1. Card Scanner & Data Extractor
 * **Path**: `POST /process-card` or `POST /api/process-card/`
@@ -153,7 +173,24 @@ All three containers (`drf_card_db`, `drf_card_web`, `drf_card_nginx`) should re
 ```
 * **Response**: Returns created `session_id`, version, generated image URL, and assistant response.
 
-### 4. Health Check
+### 4. OpenAI Key Dynamic Configuration (AES-256 Encrypted in DB)
+* **Path**: `GET` / `POST` / `DELETE` on `/api/config/openai-key/` or `/config/openai-key`
+* **Ports**: `http://localhost:6000` and `http://localhost:80`
+* **Headers**: `X-API-KEY: <your-api-secret-key>`
+* **Features**:
+  - Dynamically rotate/change OpenAI API key via API without touching `.env` or restarting containers.
+  - Automatically encrypted with AES-256 (Fernet) in PostgreSQL with SHA-256 fingerprint.
+  - **GET**: Inspect active key source (`database` or `environment`), configuration status, and safe masked preview (e.g. `sk-proj...3210`).
+  - **POST / PUT**: Set new OpenAI key:
+    ```json
+    {
+      "api_key": "sk-proj-xxxxxxxxxxxxxxxxxxxx",
+      "validate": true
+    }
+    ```
+  - **DELETE**: Remove custom key from database and revert automatically to `.env` fallback.
+
+### 5. Health Check
 * **Path**: `GET /api/health/`
 * **Response**:
 ```json
