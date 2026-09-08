@@ -5,69 +5,50 @@ from rest_framework.test import APIClient
 from rest_framework import status
 from PIL import Image
 
-from generator.services.card_drawer import generate_business_card, THEMES
+from generator.services.card_drawer import generate_business_card, STYLE_DISPATCHER
 
-class BusinessCardAPITests(TestCase):
+
+class GeneratorAPITests(TestCase):
     def setUp(self):
         self.client = APIClient()
-        self.generate_url = reverse('generate-card')
         self.health_url = reverse('health-check')
-        self.valid_payload = {
+        self.generate_url = reverse('generate-card')
+        self.chat_url = reverse('card-chat')
+
+    def test_health_check_endpoint(self):
+        """Health check endpoint must return 200 OK and healthy status."""
+        response = self.client.get(self.health_url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.json().get("status"), "healthy")
+
+    def test_generate_card_missing_prompt_returns_400(self):
+        """Prompt-based generation requires 'prompt' field."""
+        response = self.client.post(self.generate_url, data={}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('prompt', response.json())
+
+    def test_chat_card_missing_message_returns_400(self):
+        """Card studio chat requires 'message' field."""
+        response = self.client.post(self.chat_url, data={}, format='json')
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('message', response.json())
+
+    def test_generate_card_all_styles_render(self):
+        """Verify that all 4 modern card styles render full-bleed 1200x700 PNG."""
+        sample_card_data = {
             "name": "Sarah Connor",
             "designation": "Chief Technology Officer",
             "phone": "+1 (555) 019-2834",
             "email": "sarah.connor@cyberdyne.io",
             "website": "https://cyberdyne.io",
             "company_name": "Cyberdyne Systems",
-            "theme": "midnight_gold"
+            "theme": {}
         }
-
-    def test_health_check_endpoint(self):
-        """Tests that the health check endpoint returns 200 OK and healthy status."""
-        response = self.client.get(self.health_url)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.json().get("status"), "healthy")
-
-    def test_generate_card_post_success(self):
-        """Tests POST /api/generate-card/ returns a valid image/png."""
-        response = self.client.post(self.generate_url, data=self.valid_payload, format='json')
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response['Content-Type'], 'image/png')
-        
-        # Verify valid PNG signature
-        self.assertTrue(response.content.startswith(b'\x89PNG\r\n\x1a\n'))
-        
-        # Verify it can be opened by Pillow
-        image = Image.open(io.BytesIO(response.content))
-        self.assertEqual(image.size, (1050, 600))
-        self.assertEqual(image.format, 'PNG')
-
-    def test_generate_card_get_success(self):
-        """Tests GET /api/generate-card/ with query params returns image/png."""
-        response = self.client.get(self.generate_url, data=self.valid_payload)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response['Content-Type'], 'image/png')
-
-    def test_generate_card_missing_required_fields(self):
-        """Tests validation error when required fields are missing."""
-        invalid_payload = {
-            "name": "Sarah Connor"
-            # Missing designation, phone, email, website
-        }
-        response = self.client.post(self.generate_url, data=invalid_payload, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        data = response.json()
-        self.assertIn('designation', data)
-        self.assertIn('phone', data)
-        self.assertIn('email', data)
-        self.assertIn('website', data)
-
-    def test_generate_card_all_themes_render(self):
-        """Tests that all defined themes generate valid images without exceptions."""
-        for theme_key in THEMES.keys():
-            payload = self.valid_payload.copy()
-            payload['theme'] = theme_key
+        for style_key in STYLE_DISPATCHER.keys():
+            payload = sample_card_data.copy()
+            payload['layout_style'] = style_key
             img_bytes = generate_business_card(payload)
             self.assertTrue(img_bytes.startswith(b'\x89PNG\r\n\x1a\n'))
             image = Image.open(io.BytesIO(img_bytes))
-            self.assertEqual(image.size, (1050, 600))
+            self.assertEqual(image.size, (1200, 700))
+            self.assertEqual(image.format, 'PNG')

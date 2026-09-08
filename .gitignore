@@ -63,3 +63,13 @@ Desktop.ini
 nosetests.xml
 coverage.xml
 *.cover
+
+# Generated test images in root
+/*.png
+/*.jpg
+/*.jpeg
+!samples/*.png
+
+# ML model caches
+.u2net/
+.rembg/
