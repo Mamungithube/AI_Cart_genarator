@@ -57,3 +57,39 @@ class ImageProcessorAPITests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(response.data.get('success'))
         self.assertTrue(bool(response.data.get('enhanced_image_base64')))
+
+    def test_process_card_missing_openai_key_triggers_notification(self):
+        """When OpenAI API key is missing during process-card, returns 503 and notifies webhook."""
+        from unittest.mock import patch
+        test_file = _create_test_image()
+
+        with patch('card_project.key_manager.get_active_openai_key', return_value=''):
+            with patch('image_processor.views.send_openai_error_notification') as mock_notify_view:
+                response = self.client.post(
+                    self.process_url,
+                    data={'front': test_file},
+                    format='multipart'
+                )
+                self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+                self.assertFalse(response.data.get('success'))
+                mock_notify_view.assert_called()
+                msg = str(mock_notify_view.call_args[0][0]).lower()
+                self.assertIn("key", msg)
+
+    def test_process_card_openai_error_triggers_notification(self):
+        """When OpenAI GPT-4o fails during process-card, notifies webhook."""
+        from unittest.mock import patch
+        test_file = _create_test_image()
+
+        with patch('card_project.key_manager.get_active_openai_key', return_value='sk-test-key'):
+            with patch('image_processor.views.crop_business_card', return_value=None):
+                with patch('image_processor.views.extract_with_rotation', side_effect=RuntimeError("OpenAI API error (429): Quota exceeded")):
+                    with patch('image_processor.views.send_openai_error_notification') as mock_notify_view:
+                        response = self.client.post(
+                            self.process_url,
+                            data={'front': test_file},
+                            format='multipart'
+                        )
+                        self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+                        self.assertFalse(response.data.get('success'))
+                        mock_notify_view.assert_called()

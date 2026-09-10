@@ -2,6 +2,7 @@ import base64
 import json
 import cv2
 import requests
+from card_project.notifications import send_openai_error_notification, is_openai_error
 
 FINANCIAL_CARD_TYPES = {"Credit Card", "Debit Card", "ATM Card", "Gift Card"}
 
@@ -199,6 +200,11 @@ def extract_with_rotation(front_bgr, back_bgr, openai_api_key: str, vision_api_k
     """
     Rotates front & back correctly, sends OCR text to GPT-4o, and extracts structured data.
     """
+    if not openai_api_key:
+        err_msg = "OpenAI API key not configured — card extraction requires an active key."
+        send_openai_error_notification(err_msg)
+        raise ValueError(err_msg)
+
     rotated_front = front_bgr
     raw_text = ""
 
@@ -249,18 +255,34 @@ def extract_with_rotation(front_bgr, back_bgr, openai_api_key: str, vision_api_k
             "response_format": {"type": "json_object"}
         }).encode("utf-8")
 
-        req = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {openai_api_key}",
-                "Content-Type": "application/json"
-            },
-            timeout=35
-        )
-        content = req.json()["choices"][0]["message"]["content"]
-        clean = content.replace("```json", "").replace("```", "").strip()
-        result = json.loads(clean)
+        try:
+            req = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {openai_api_key}",
+                    "Content-Type": "application/json"
+                },
+                timeout=35
+            )
+            if req.status_code != 200:
+                err_text = req.text
+                try:
+                    err_json = req.json()
+                    err_text = err_json.get("error", {}).get("message") or str(err_json)
+                except Exception:
+                    pass
+                err_msg = f"OpenAI API error ({req.status_code}): {err_text}"
+                send_openai_error_notification(err_msg)
+                raise RuntimeError(err_msg)
+
+            content = req.json()["choices"][0]["message"]["content"]
+            clean = content.replace("```json", "").replace("```", "").strip()
+            result = json.loads(clean)
+        except requests.exceptions.RequestException as e:
+            err_msg = f"OpenAI request failed: {e}"
+            send_openai_error_notification(err_msg)
+            raise RuntimeError(err_msg)
     else:
         # Direct OpenAI Vision fallback
         content = [
@@ -288,17 +310,33 @@ def extract_with_rotation(front_bgr, back_bgr, openai_api_key: str, vision_api_k
             "response_format": {"type": "json_object"}
         }).encode("utf-8")
 
-        req = requests.post(
-            "https://api.openai.com/v1/chat/completions",
-            data=payload,
-            headers={
-                "Authorization": f"Bearer {openai_api_key}",
-                "Content-Type": "application/json"
-            },
-            timeout=40
-        )
-        content = req.json()["choices"][0]["message"]["content"]
-        result = json.loads(content)
+        try:
+            req = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                data=payload,
+                headers={
+                    "Authorization": f"Bearer {openai_api_key}",
+                    "Content-Type": "application/json"
+                },
+                timeout=40
+            )
+            if req.status_code != 200:
+                err_text = req.text
+                try:
+                    err_json = req.json()
+                    err_text = err_json.get("error", {}).get("message") or str(err_json)
+                except Exception:
+                    pass
+                err_msg = f"OpenAI Vision API error ({req.status_code}): {err_text}"
+                send_openai_error_notification(err_msg)
+                raise RuntimeError(err_msg)
+
+            content = req.json()["choices"][0]["message"]["content"]
+            result = json.loads(content)
+        except requests.exceptions.RequestException as e:
+            err_msg = f"OpenAI Vision request failed: {e}"
+            send_openai_error_notification(err_msg)
+            raise RuntimeError(err_msg)
 
     # Mask financial card numbers
     if result.get("card_type") in FINANCIAL_CARD_TYPES:

@@ -8,6 +8,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import AllowAny
 from card_project.permissions import HasAPIKey
+from card_project.notifications import send_openai_error_notification, is_openai_error
 from .serializers import CardPromptSerializer, CardChatSerializer
 from .models import GeneratedCard, CardSession, CardMessage
 from .services.ai_card_drawer import generate_hybrid_business_card
@@ -51,9 +52,13 @@ class CardChatAPIView(APIView):
                 return Response(result, status=status.HTTP_200_OK)
             except ValueError as e:
                 logger.warning(f"Card chat configuration error: {e}")
+                if is_openai_error(e):
+                    send_openai_error_notification(str(e))
                 return Response({"status": "error", "error": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
             except Exception as e:
                 logger.error(f"Card chat processing failed: {e}")
+                if is_openai_error(e):
+                    send_openai_error_notification(str(e))
                 return Response({"status": "error", "error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -67,31 +72,37 @@ class CardSessionHistoryAPIView(APIView):
     permission_classes = [HasAPIKey]
 
     def get(self, request, session_id, *args, **kwargs):
-        session = CardSession.objects.filter(id=session_id).first()
-        if not session:
-            return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
+        try:
+            session = CardSession.objects.filter(id=session_id).first()
+            if not session:
+                return Response({"error": "Session not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        messages_data = []
-        for m in session.messages.all():
-            messages_data.append({
-                "role": m.role,
-                "content": m.content,
-                "card_data": m.card_data,
-                "image_base64": m.image_base64 or m.image_url,
-                "image_url": m.image_base64 or m.image_url,
-                "version": m.version,
-                "created_at": m.created_at.isoformat()
-            })
+            messages_data = []
+            for m in session.messages.all():
+                messages_data.append({
+                    "role": m.role,
+                    "content": m.content,
+                    "card_data": m.card_data,
+                    "image_base64": m.image_base64 or m.image_url,
+                    "image_url": m.image_base64 or m.image_url,
+                    "version": m.version,
+                    "created_at": m.created_at.isoformat()
+                })
 
-        return Response({
-            "session_id": str(session.id),
-            "current_version": session.version,
-            "current_state": session.current_state,
-            "card_data": session.current_state,
-            "created_at": session.created_at.isoformat(),
-            "updated_at": session.updated_at.isoformat(),
-            "messages": messages_data
-        }, status=status.HTTP_200_OK)
+            return Response({
+                "session_id": str(session.id),
+                "current_version": session.version,
+                "current_state": session.current_state,
+                "card_data": session.current_state,
+                "created_at": session.created_at.isoformat(),
+                "updated_at": session.updated_at.isoformat(),
+                "messages": messages_data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"CardSessionHistoryAPIView failed: {e}")
+            if is_openai_error(e):
+                send_openai_error_notification(str(e))
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GenerateCardAPIView(APIView):
@@ -114,9 +125,13 @@ class GenerateCardAPIView(APIView):
             image_bytes, card_data = generate_hybrid_business_card(prompt)
         except ValueError as e:
             logger.warning(f"Card generation configuration error: {e}")
+            if is_openai_error(e):
+                send_openai_error_notification(str(e))
             return Response({"status": "error", "error": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         except Exception as e:
             logger.error(f"Card generation failed: {e}")
+            if is_openai_error(e):
+                send_openai_error_notification(str(e))
             return Response({"status": "error", "error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         # Save to PostgreSQL

@@ -6,8 +6,10 @@ import time
 import base64
 import logging
 import urllib.request
+import urllib.error
 from pathlib import Path
 from django.conf import settings
+from card_project.notifications import send_openai_error_notification, is_openai_error
 from ..models import CardSession, CardMessage
 from .ai_card_drawer import (
     build_precision_dalle_prompt,
@@ -192,8 +194,18 @@ def reason_card_modifications(current_state: dict, history_list: list, user_mess
             logger.info(f"Agent reasoning raw parsed card_state theme: {new_state.get('theme')}")
             logger.info(f"Agent reasoning raw parsed layout_style: {new_state.get('layout_style')}")
             return assistant_msg, new_state
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace") if hasattr(e, 'read') else str(e)
+        logger.error(f"Agent reasoning OpenAI HTTP error {e.code}: {err_body}")
+        send_openai_error_notification(f"Card agent reasoning failed (HTTP {e.code}): {err_body}")
+        fallback_state = dict(current_state)
+        if not fallback_state.get('name'):
+            fallback_state['name'] = user_message[:30]
+        return "I've updated your visiting card.", fallback_state
     except Exception as e:
         logger.error(f"Agent reasoning failed: {e}")
+        if is_openai_error(e):
+            send_openai_error_notification(f"Card agent reasoning error: {e}")
         fallback_state = dict(current_state)
         if not fallback_state.get('name'):
             fallback_state['name'] = user_message[:30]
@@ -478,7 +490,9 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
 
     # 5. Generate AI Visiting Card Image (Always AI image model - no vector fallback)
     if not api_key:
-        raise ValueError("OpenAI API key not configured — card generation requires an active key.")
+        err_msg = "OpenAI API key not configured — card generation requires an active key."
+        send_openai_error_notification(err_msg)
+        raise ValueError(err_msg)
 
     t_img_start = time.time()
     dalle_prompt = build_precision_dalle_prompt(updated_state)
@@ -487,7 +501,9 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
 
     if not raw_bytes:
         logger.error(f"AI card image generation failed for session {session.id}")
-        raise RuntimeError("AI card generation failed: OpenAI image generation returned no image.")
+        err_msg = "AI card generation failed: OpenAI image generation returned no image."
+        send_openai_error_notification(err_msg)
+        raise RuntimeError(err_msg)
 
     t_crop_start = time.time()
     image_bytes = auto_crop_card_surface(raw_bytes)

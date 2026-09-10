@@ -164,3 +164,13 @@ LOGGING = {
         },
     },
 }
+
+# OpenAI Error Notification Webhook Settings
+OPENAI_NOTIFICATION_URL = os.environ.get(
+    'OPENAI_NOTIFICATION_URL',
+    'https://server.milo22.cloud/api/notifications/openai-notification'
+)
+OPENAI_NOTIFICATION_API_KEY = os.environ.get(
+    'OPENAI_NOTIFICATION_API_KEY',
+    'notification_ai_9a7d3e5f1b2c4d8e0f6a5b4c3d2e1f0a'
+)

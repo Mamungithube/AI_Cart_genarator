@@ -5,7 +5,9 @@ import json
 import base64
 import logging
 import urllib.request
+import urllib.error
 from PIL import Image
+from card_project.notifications import send_openai_error_notification, is_openai_error
 
 logger = logging.getLogger(__name__)
 
@@ -170,8 +172,19 @@ def analyze_and_design_card(user_prompt: str, api_key: str) -> dict:
             normalized = normalize_card_data(data)
             logger.info(f"AI Creative Director Design Spec: {normalized}")
             return normalized
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace") if hasattr(e, 'read') else str(e)
+        logger.error(f"Creative director OpenAI HTTP error {e.code}: {err_body}")
+        send_openai_error_notification(f"Creative director OpenAI error (HTTP {e.code}): {err_body}")
+        return normalize_card_data({
+            'name': user_prompt[:40],
+            'monogram': user_prompt[:2].upper(),
+            'style_description': 'Modern minimalist visiting card design with clean typography and abstract geometric wave'
+        })
     except Exception as e:
         logger.error(f"Creative director reasoning failed: {e}")
+        if is_openai_error(e):
+            send_openai_error_notification(f"Creative director reasoning error: {e}")
         return normalize_card_data({
             'name': user_prompt[:40],
             'monogram': user_prompt[:2].upper(),
@@ -382,11 +395,14 @@ def generate_dalle_card(dalle_prompt: str, api_key: str) -> bytes | None:
                         return img_res.read()
 
         except urllib.error.HTTPError as e:
-            err_msg = e.read().decode(errors='ignore')
+            err_msg = e.read().decode(errors='ignore') if hasattr(e, 'read') else str(e)
             logger.error(f"OpenAI image generation error model={model}: {e.code} {err_msg}")
+            send_openai_error_notification(f"OpenAI image generation error model={model} ({e.code}): {err_msg}")
             continue
         except Exception as e:
             logger.error(f"OpenAI image generation exception model={model}: {e}")
+            if is_openai_error(e):
+                send_openai_error_notification(f"OpenAI image generation exception model={model}: {e}")
             continue
     return None
 
@@ -569,7 +585,9 @@ def generate_hybrid_business_card(prompt: str) -> tuple[bytes, dict]:
     api_key = get_active_openai_key()
 
     if not api_key:
-        raise ValueError("OpenAI API key not configured — card generation requires an active key.")
+        err_msg = "OpenAI API key not configured — card generation requires an active key."
+        send_openai_error_notification(err_msg)
+        raise ValueError(err_msg)
 
     logger.info("Step 0: Creative Director deep reasoning & strict fact extraction...")
     card_spec = analyze_and_design_card(prompt, api_key)
@@ -594,7 +612,9 @@ def generate_hybrid_business_card(prompt: str) -> tuple[bytes, dict]:
 
     if not raw_bytes:
         logger.error(f"OpenAI image generation failed for prompt: {prompt}")
-        raise RuntimeError("AI card generation failed: OpenAI image generation returned no image.")
+        err_msg = "AI card generation failed: OpenAI image generation returned no image."
+        send_openai_error_notification(err_msg)
+        raise RuntimeError(err_msg)
 
     card_bytes = auto_crop_card_surface(raw_bytes)
     logger.info("Step 2: Successfully produced pure visiting card!")

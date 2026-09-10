@@ -733,4 +733,68 @@ class CardAgentBugFixesTests(TestCase):
                 self.assertIn("Bypass Surgery", prompt)
 
 
+class OpenAINotificationTests(TestCase):
+    """
+    Tests for the OpenAI error notification webhook:
+    POST https://server.milo22.cloud/api/notifications/openai-notification
+    X-API-KEY: notification_ai_9a7d3e5f1b2c4d8e0f6a5b4c3d2e1f0a
+    Body: {"message": "..."}
+    """
+    def setUp(self):
+        self.client = APIClient()
+        self.api_key = os.environ.get('API_SECRET_KEY', '')
+        self.client.credentials(HTTP_X_API_KEY=self.api_key)
+        self.chat_url = reverse('card-chat')
+
+    def test_notification_service_payload_and_headers(self):
+        """send_openai_error_notification must deliver the correct URL, headers, and body."""
+        from unittest.mock import patch
+        from card_project.notifications import send_openai_error_notification
+
+        with patch('requests.post') as mock_post:
+            mock_post.return_value.status_code = 200
+            test_error = "OpenAI API rate limit exceeded: quota 429"
+            send_openai_error_notification(test_error, async_send=False)
+
+            mock_post.assert_called_once()
+            args, kwargs = mock_post.call_args
+            self.assertEqual(args[0], "https://server.milo22.cloud/api/notifications/openai-notification")
+            self.assertEqual(kwargs['headers']['X-API-KEY'], "notification_ai_9a7d3e5f1b2c4d8e0f6a5b4c3d2e1f0a")
+            self.assertEqual(kwargs['json']['message'], test_error)
+
+    def test_card_chat_missing_openai_key_triggers_notification(self):
+        """When OpenAI API key is missing during chat, notification webhook must be triggered."""
+        from unittest.mock import patch
+
+        with patch('card_project.key_manager.get_active_openai_key', return_value=''):
+            with patch('generator.views.send_openai_error_notification') as mock_notify_view, \
+                 patch('generator.services.card_agent.send_openai_error_notification') as mock_notify_agent:
+                response = self.client.post(self.chat_url, data={"message": "Create a modern visiting card"}, format='json')
+                self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+                self.assertTrue(mock_notify_view.called or mock_notify_agent.called)
+
+    def test_card_chat_openai_error_triggers_notification(self):
+        """When OpenAI API fails (e.g. 429 Insufficient Quota), notification webhook must be triggered."""
+        from unittest.mock import patch
+
+        with patch('card_project.key_manager.get_active_openai_key', return_value='sk-test-valid-key'):
+            with patch('generator.services.card_agent.generate_dalle_card', return_value=None):
+                with patch('generator.services.card_agent.send_openai_error_notification') as mock_notify_agent, \
+                     patch('generator.views.send_openai_error_notification') as mock_notify_view:
+                    response = self.client.post(self.chat_url, data={"message": "Visiting card for Alice"}, format='json')
+                    self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
+                    self.assertTrue(mock_notify_agent.called or mock_notify_view.called)
+
+    def test_notification_network_failure_is_resilient(self):
+        """Even if webhook endpoint fails or times out, the notification service does not crash."""
+        from unittest.mock import patch
+        import requests
+        from card_project.notifications import send_openai_error_notification
+
+        with patch('requests.post', side_effect=requests.exceptions.ConnectTimeout("Connection timed out")):
+            result = send_openai_error_notification("Some OpenAI error", async_send=False)
+            self.assertFalse(result)
+
+
+
 

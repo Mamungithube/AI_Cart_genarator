@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from card_project.permissions import HasAPIKey
+from card_project.notifications import send_openai_error_notification, is_openai_error
 
 from .services.cropper import crop_business_card
 from .services.enhancer import enhance_card_image
@@ -52,6 +53,13 @@ class ProcessCardView(APIView):
 
         from card_project.key_manager import get_active_openai_key
         openai_api_key = get_active_openai_key()
+        if not openai_api_key:
+            err_msg = "OpenAI API key not configured — card extraction requires an active key."
+            send_openai_error_notification(err_msg)
+            return Response(
+                {"success": False, "error": err_msg},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
 
         try:
             # 1. Crop cards from photo
@@ -90,6 +98,8 @@ class ProcessCardView(APIView):
 
         except Exception as e:
             logger.exception(f"process-card failed: {e}")
+            if is_openai_error(e):
+                send_openai_error_notification(str(e))
             return Response({
                 "success": False,
                 "error": str(e)
@@ -141,6 +151,8 @@ class EnhanceCardView(APIView):
 
         except Exception as e:
             logger.exception(f"enhance-card failed: {e}")
+            if is_openai_error(e):
+                send_openai_error_notification(str(e))
             return Response({
                 "success": False,
                 "error": str(e)
