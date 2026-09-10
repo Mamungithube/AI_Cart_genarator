@@ -348,19 +348,20 @@ def generate_dalle_card(dalle_prompt: str, api_key: str) -> bytes | None:
     logger.info(f"Generating DALL-E image with final prompt:\n{dalle_prompt}")
 
     model_configs = [
+        ('gpt-image-1', '1536x1024'),
         ('dall-e-3', '1792x1024'),
         ('dall-e-2', '1024x1024'),
     ]
 
     for model, size in model_configs:
         try:
-            payload = json.dumps({
+            req_data = {
                 'model': model,
                 'prompt': dalle_prompt,
                 'n': 1,
                 'size': size,
-                'response_format': 'b64_json'
-            }).encode()
+            }
+            payload = json.dumps(req_data).encode()
 
             req = urllib.request.Request(
                 'https://api.openai.com/v1/images/generations',
@@ -381,7 +382,8 @@ def generate_dalle_card(dalle_prompt: str, api_key: str) -> bytes | None:
                         return img_res.read()
 
         except urllib.error.HTTPError as e:
-            logger.error(f"OpenAI image generation error model={model}: {e.code} {e.read().decode(errors='ignore')}")
+            err_msg = e.read().decode(errors='ignore')
+            logger.error(f"OpenAI image generation error model={model}: {e.code} {err_msg}")
             continue
         except Exception as e:
             logger.error(f"OpenAI image generation exception model={model}: {e}")
