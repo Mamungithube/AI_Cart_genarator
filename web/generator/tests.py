@@ -18,13 +18,12 @@ class GeneratorAPITests(TestCase):
         self.api_key = os.environ.get('API_SECRET_KEY', '')
         self.client.credentials(HTTP_X_API_KEY=self.api_key)
         self.health_url = reverse('health-check')
-        self.generate_url = reverse('generate-card')
         self.chat_url = reverse('card-chat')
 
     def test_unauthorized_without_api_key(self):
         """Request without API key to protected endpoint must return 403."""
         unauth_client = APIClient()
-        response = unauth_client.post(self.generate_url, data={}, format='json')
+        response = unauth_client.post(self.chat_url, data={}, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_health_check_endpoint(self):
@@ -34,35 +33,11 @@ class GeneratorAPITests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.json().get("status"), "healthy")
 
-    def test_generate_card_missing_prompt_returns_400(self):
-        """Prompt-based generation requires 'prompt' field."""
-        response = self.client.post(self.generate_url, data={}, format='json')
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('prompt', response.json())
-
     def test_chat_card_missing_message_returns_400(self):
         """Card studio chat requires 'message' field."""
         response = self.client.post(self.chat_url, data={}, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('message', response.json())
-
-    def test_generate_card_missing_openai_key_returns_503(self):
-        """When OpenAI API key is not configured, endpoint must return 503 error response."""
-        from unittest.mock import patch
-        with patch('card_project.key_manager.get_active_openai_key', return_value=''):
-            response = self.client.post(self.generate_url, data={"prompt": "John Doe, Developer"}, format='json')
-            self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
-            self.assertEqual(response.json().get("status"), "error")
-            self.assertIn("key", response.json().get("error", "").lower())
-
-    def test_generate_card_dalle_failure_returns_502(self):
-        """When DALL-E image generation fails across all models, endpoint must return 502 error response."""
-        from unittest.mock import patch
-        with patch('generator.services.ai_card_drawer.generate_dalle_card', return_value=None):
-            response = self.client.post(self.generate_url, data={"prompt": "Jane Doe, Tech Lead"}, format='json')
-            self.assertEqual(response.status_code, status.HTTP_502_BAD_GATEWAY)
-            self.assertEqual(response.json().get("status"), "error")
-            self.assertIn("AI card generation failed", response.json().get("error", ""))
 
 
 class OpenAIKeyManagementTests(TestCase):
@@ -304,16 +279,6 @@ class CardAgentBugFixesTests(TestCase):
                 self.assertIn("user_prompt", chat_res.json())
                 self.assertEqual(chat_res.json()["user_prompt"], test_msg)
 
-        # 3. Verify GenerateCardAPIView response has X-User-Prompt header
-        generate_url = reverse('generate-card')
-        prompt_text = "Visiting card for Alice Smith at TechCorp"
-        with patch('generator.services.ai_card_drawer.generate_dalle_card', return_value=make_dummy_png()):
-            gen_res = client.post(generate_url, data={"prompt": prompt_text}, format='json')
-            self.assertEqual(gen_res.status_code, status.HTTP_200_OK)
-            self.assertIn('X-User-Prompt', gen_res.headers)
-            decoded_header = urllib.parse.unquote(gen_res.headers['X-User-Prompt'])
-            self.assertEqual(decoded_header, prompt_text)
-
     def test_card_chat_missing_openai_key_returns_503(self):
         """When OpenAI API key is missing during chat turn, returns 503."""
         from unittest.mock import patch
@@ -328,7 +293,7 @@ class CardAgentBugFixesTests(TestCase):
             self.assertEqual(res.json().get("status"), "error")
 
     def test_card_chat_dalle_failure_returns_502(self):
-        """When DALL-E image generation fails during chat turn, returns 502."""
+        """When card image generation fails during chat turn, returns 502."""
         from unittest.mock import patch
         client = APIClient()
         api_key = os.environ.get('API_SECRET_KEY', '')
@@ -337,7 +302,7 @@ class CardAgentBugFixesTests(TestCase):
 
         mock_state = {"name": "Test User", "layout_style": "cyber_tech"}
         with patch('generator.services.card_agent.reason_card_modifications', return_value=("Reasoned", mock_state)):
-            with patch('generator.services.card_agent.generate_dalle_card', return_value=None):
+            with patch('generator.services.card_agent.generate_business_card', side_effect=RuntimeError("AI card generation failed: Render error")):
                 res = client.post(chat_url, data={"message": "Make a card"}, format='json')
                 self.assertEqual(res.status_code, status.HTTP_502_BAD_GATEWAY)
                 self.assertEqual(res.json().get("status"), "error")
@@ -431,13 +396,13 @@ class CardAgentBugFixesTests(TestCase):
         client = APIClient()
         api_key = os.environ.get('API_SECRET_KEY', '')
         client.credentials(HTTP_X_API_KEY=api_key)
-        generate_url = reverse('generate-card')
+        chat_url = reverse('card-chat')
 
-        with patch('generator.services.ai_card_drawer.generate_dalle_card', return_value=make_dummy_png()):
-            gen_res = client.post(generate_url, data={"prompt": "Visiting card for Bob"}, format='json')
+        with patch('generator.services.card_agent.reason_card_modifications', return_value=("Created", mock_state)):
+            gen_res = client.post(chat_url, data={"message": "Visiting card for Bob"}, format='json')
             self.assertEqual(gen_res.status_code, status.HTTP_200_OK)
-            self.assertIn('X-AI-Note', gen_res.headers)
-            self.assertIn("manually verified", gen_res.headers['X-AI-Note'])
+            self.assertIn('note', gen_res.json())
+            self.assertIn("manually verified", gen_res.json()['note'])
 
     def test_detect_color_intent_precision(self):
         """Verify detect_color_intent only triggers on genuine color instructions, not text containing color words."""
@@ -778,7 +743,7 @@ class OpenAINotificationTests(TestCase):
         from unittest.mock import patch
 
         with patch('card_project.key_manager.get_active_openai_key', return_value='sk-test-valid-key'):
-            with patch('generator.services.card_agent.generate_dalle_card', return_value=None):
+            with patch('generator.services.card_agent.reason_card_modifications', side_effect=RuntimeError("RateLimitError: 429 Insufficient Quota")):
                 with patch('generator.services.card_agent.send_openai_error_notification') as mock_notify_agent, \
                      patch('generator.views.send_openai_error_notification') as mock_notify_view:
                     response = self.client.post(self.chat_url, data={"message": "Visiting card for Alice"}, format='json')
@@ -794,6 +759,603 @@ class OpenAINotificationTests(TestCase):
         with patch('requests.post', side_effect=requests.exceptions.ConnectTimeout("Connection timed out")):
             result = send_openai_error_notification("Some OpenAI error", async_send=False)
             self.assertFalse(result)
+
+
+class CardCompositionAndRedesignIntentTests(TestCase):
+    """
+    Tests for:
+    1. Redesign / Dissatisfaction Intent detection & priority bypass.
+    2. Structural composition diversity with COMPOSITION_VARIANTS.
+    3. Strict preservation of (layout_style, theme, composition_variant) on text-only edits.
+    4. Rollback restoring composition_variant from previous version.
+    5. Fallback on invalid/fabricated composition_variant from GPT.
+    """
+
+    def test_detect_redesign_intent_matches_all_required_phrases(self):
+        """Verify detect_redesign_intent catches explicit redesign & dissatisfaction signals."""
+        from generator.services.card_agent import detect_redesign_intent
+
+        explicit_phrases = [
+            "redesign this",
+            "I want a different design please",
+            "give it a fresh look",
+            "give me a new look for the card",
+            "change the design now",
+            "make it look different please",
+            "redesign this completely",
+        ]
+        for phrase in explicit_phrases:
+            self.assertTrue(detect_redesign_intent(phrase), f"Failed to match explicit phrase: {phrase}")
+
+        dissatisfaction_phrases = [
+            "this design is very bad",
+            "this design is bad",
+            "i don't like this",
+            "i dont like it",
+            "not good",
+            "looks bad",
+            "don't like the design",
+            "hate this design",
+            "this looks bad",
+            "not what i wanted",
+            "can you make it better",
+            "this isn't good",
+            "this isnt good",
+        ]
+        for phrase in dissatisfaction_phrases:
+            self.assertTrue(detect_redesign_intent(phrase), f"Failed to match dissatisfaction phrase: {phrase}")
+
+        # Text edits and normal prompts must NOT trigger redesign intent
+        normal_phrases = [
+            "change name to John Doe",
+            "add phone 01837747474",
+            "my company is Badshah Foods",
+            "change address to Banani Dhaka",
+            "make it red",
+        ]
+        for phrase in normal_phrases:
+            self.assertFalse(detect_redesign_intent(phrase), f"False positive redesign intent on: {phrase}")
+
+    def test_redesign_intent_dissatisfaction_changes_all_three(self):
+        """User saying 'this design is very bad' changes layout_style, theme, and composition_variant."""
+        from unittest.mock import patch
+        from generator.models import CardSession
+        from generator.services.card_agent import process_card_agent_turn
+
+        initial_theme = {'bg_card': [22, 37, 54], 'accent': [245, 166, 35]}
+        session = CardSession.objects.create(
+            current_state={
+                'name': 'Michael Chen',
+                'designation': 'Senior Financial Advisor',
+                'company_name': 'Wealth Plus',
+                'layout_style': 'luxury_gold',
+                'theme': initial_theme,
+                'composition_variant': 'centered_hero',
+            },
+            version=1
+        )
+
+        mock_gpt_state = {
+            'name': 'Michael Chen',
+            'designation': 'Senior Financial Advisor',
+            'company_name': 'Wealth Plus',
+            'layout_style': 'cyber_tech',
+            'theme': {'bg_card': [10, 16, 28], 'accent': [0, 229, 255]},
+            'composition_variant': 'split_diagonal',
+        }
+
+        with patch('generator.services.card_agent.reason_card_modifications', return_value=("Redesigned card.", mock_gpt_state)):
+            with patch('generator.services.card_agent.generate_dalle_card', return_value=make_dummy_png()):
+                res = process_card_agent_turn(session_id=str(session.id), user_message="this design is very bad")
+                session.refresh_from_db()
+                # All 3 visual attributes MUST have changed from previous state
+                self.assertNotEqual(session.current_state['layout_style'], 'luxury_gold')
+                self.assertNotEqual(session.current_state['theme'], initial_theme)
+                self.assertNotEqual(session.current_state['composition_variant'], 'centered_hero')
+                self.assertEqual(session.current_state['layout_style'], 'cyber_tech')
+                self.assertEqual(session.current_state['composition_variant'], 'split_diagonal')
+
+    def test_redesign_intent_explicit_redesign_changes_all_three(self):
+        """User saying 'redesign this completely' changes layout_style, theme, and composition_variant."""
+        from unittest.mock import patch
+        from generator.models import CardSession
+        from generator.services.card_agent import process_card_agent_turn
+
+        session = CardSession.objects.create(
+            current_state={
+                'name': 'Sarah Connor',
+                'layout_style': 'corner_arcs',
+                'theme': {'bg_card': [26, 32, 38]},
+                'composition_variant': 'left_monogram_stack',
+            },
+            version=1
+        )
+
+        # Even if GPT gave the same layout_style and empty composition_variant, round-robin ensures they change
+        mock_gpt_state = {
+            'name': 'Sarah Connor',
+            'layout_style': 'corner_arcs',
+            'composition_variant': '',
+        }
+
+        with patch('generator.services.card_agent.reason_card_modifications', return_value=("Redesigned.", mock_gpt_state)):
+            with patch('generator.services.card_agent.generate_dalle_card', return_value=make_dummy_png()):
+                res = process_card_agent_turn(session_id=str(session.id), user_message="redesign this completely")
+                session.refresh_from_db()
+                self.assertNotEqual(session.current_state['layout_style'], 'corner_arcs')
+                self.assertNotEqual(session.current_state['composition_variant'], 'left_monogram_stack')
+
+    def test_color_intent_preserves_layout_style_and_composition_variant(self):
+        """'make it red' updates theme, but strictly preserves layout_style and composition_variant."""
+        from unittest.mock import patch
+        from generator.models import CardSession
+        from generator.services.card_agent import process_card_agent_turn
+
+        initial_theme = {'bg_card': [22, 37, 54], 'accent': [245, 166, 35]}
+        session = CardSession.objects.create(
+            current_state={
+                'name': 'Tony Stark',
+                'layout_style': 'cyber_tech',
+                'theme': initial_theme,
+                'composition_variant': 'split_diagonal',
+            },
+            version=1
+        )
+
+        red_theme = {'bg_card': [139, 0, 0], 'accent': [255, 69, 0]}
+        mock_gpt_state = {
+            'name': 'Tony Stark',
+            'layout_style': 'luxury_gold',  # GPT attempts to alter style
+            'theme': red_theme,
+            'composition_variant': 'top_banner',  # GPT attempts to alter composition
+        }
+
+        with patch('generator.services.card_agent.reason_card_modifications', return_value=("Updated colors.", mock_gpt_state)):
+            with patch('generator.services.card_agent.generate_dalle_card', return_value=make_dummy_png()):
+                res = process_card_agent_turn(session_id=str(session.id), user_message="make it red")
+                session.refresh_from_db()
+                # Theme updated to red
+                self.assertEqual(session.current_state['theme'], red_theme)
+                # Layout style and composition variant strictly preserved!
+                self.assertEqual(session.current_state['layout_style'], 'cyber_tech')
+                self.assertEqual(session.current_state['composition_variant'], 'split_diagonal')
+
+    def test_text_only_edits_strictly_preserve_all_three(self):
+        """Text edits like adding phone or company strictly preserve layout_style, theme, and composition_variant."""
+        from unittest.mock import patch
+        from generator.models import CardSession
+        from generator.services.card_agent import process_card_agent_turn
+
+        initial_theme = {'bg_card': [13, 15, 20], 'accent': [212, 175, 55]}
+        session = CardSession.objects.create(
+            current_state={
+                'name': 'Bruce Wayne',
+                'company_name': 'Wayne Enterprises',
+                'layout_style': 'luxury_gold',
+                'theme': initial_theme,
+                'composition_variant': 'asymmetric_offset',
+            },
+            version=1
+        )
+
+        # Mock GPT output attempting to change style, theme, and composition
+        mock_gpt_state = {
+            'name': 'Bruce Wayne',
+            'company_name': 'Wayne Enterprises',
+            'phone': ['01837747474'],
+            'layout_style': 'organic_waves',
+            'theme': {'bg_card': [0, 0, 0]},
+            'composition_variant': 'centered_hero',
+        }
+
+        with patch('generator.services.card_agent.reason_card_modifications', return_value=("Added phone.", mock_gpt_state)):
+            with patch('generator.services.card_agent.generate_dalle_card', return_value=make_dummy_png()):
+                res = process_card_agent_turn(session_id=str(session.id), user_message="add my phone number 01837747474")
+                session.refresh_from_db()
+                self.assertEqual(session.current_state['phone'], ['01837747474'])
+                self.assertEqual(session.current_state['layout_style'], 'luxury_gold')
+                self.assertEqual(session.current_state['theme'], initial_theme)
+                self.assertEqual(session.current_state['composition_variant'], 'asymmetric_offset')
+
+    def test_rollback_restores_previous_composition_variant(self):
+        """Rollback restores the earlier version's composition_variant as well as layout_style."""
+        from unittest.mock import patch
+        from generator.models import CardSession, CardMessage
+        from generator.services.card_agent import process_card_agent_turn
+
+        session = CardSession.objects.create(
+            current_state={
+                'name': 'Clark Kent',
+                'layout_style': 'corner_arcs',
+                'theme': {'bg_card': [26, 32, 38]},
+                'composition_variant': 'right_aligned_monogram',
+            },
+            version=2
+        )
+
+        # V1 had cyber_tech with centered_hero
+        CardMessage.objects.create(
+            session=session,
+            role='assistant',
+            content='Initial design',
+            card_data={
+                'name': 'Clark Kent',
+                'layout_style': 'cyber_tech',
+                'theme': {'bg_card': [10, 16, 28]},
+                'composition_variant': 'centered_hero',
+            },
+            version=1
+        )
+
+        mock_gpt_state = {
+            'name': 'Clark Kent',
+            'layout_style': 'corner_arcs',
+            'composition_variant': 'right_aligned_monogram',
+        }
+
+        with patch('generator.services.card_agent.reason_card_modifications', return_value=("Reverted.", mock_gpt_state)):
+            with patch('generator.services.card_agent.generate_dalle_card', return_value=make_dummy_png()):
+                res = process_card_agent_turn(session_id=str(session.id), user_message="bring back the previous design")
+                session.refresh_from_db()
+                self.assertEqual(session.current_state['layout_style'], 'cyber_tech')
+                self.assertEqual(session.current_state['composition_variant'], 'centered_hero')
+
+    def test_invalid_composition_variant_falls_back_cleanly(self):
+        """Fabricated or typo composition_variant from GPT falls back cleanly and is never in prompt or state."""
+        from unittest.mock import patch
+        from generator.services.card_agent import process_card_agent_turn
+        from generator.services.ai_card_drawer import COMPOSITION_VARIANTS, build_precision_dalle_prompt
+
+        # GPT sends hallucinated variant 'crazy_diagonal_split_hero'
+        mock_gpt_state = {
+            'name': 'Diana Prince',
+            'layout_style': 'organic_waves',
+            'composition_variant': 'crazy_diagonal_split_hero',
+        }
+
+        with patch('generator.services.card_agent.reason_card_modifications', return_value=("Created.", mock_gpt_state)):
+            with patch('generator.services.card_agent.generate_dalle_card', return_value=make_dummy_png()):
+                res = process_card_agent_turn(session_id=None, user_message="Card for Diana Prince")
+                variant = res['card_data']['composition_variant']
+                self.assertIn(variant, COMPOSITION_VARIANTS)
+                self.assertNotEqual(variant, 'crazy_diagonal_split_hero')
+
+                # Verify DALL-E prompt does not contain the fabricated string and contains valid MANDATORY COMPOSITION
+                prompt = build_precision_dalle_prompt(res['card_data'])
+                self.assertNotIn('crazy_diagonal_split_hero', prompt)
+                self.assertIn('MANDATORY COMPOSITION:', prompt)
+
+    def test_build_precision_dalle_prompt_includes_composition_mandate(self):
+        """Verify build_precision_dalle_prompt injects the correct composition description."""
+        from generator.services.ai_card_drawer import build_precision_dalle_prompt, COMPOSITION_VARIANTS
+
+        for key, desc in COMPOSITION_VARIANTS.items():
+            card_spec = {
+                'name': 'John Tester',
+                'layout_style': 'corner_arcs',
+                'composition_variant': key
+            }
+            prompt = build_precision_dalle_prompt(card_spec)
+            self.assertIn(f"MANDATORY COMPOSITION: {desc}.", prompt)
+
+    def test_same_profession_distinct_sessions_composition_diversity(self):
+        """Verify different prompts for same profession yield diverse composition variants."""
+        from generator.services.card_agent import process_card_agent_turn
+        from unittest.mock import patch
+
+        prompts = [
+            "Michael Chen, Senior Financial Advisor at Wealth Plus, mchen@wealthplus.com",
+            "David Vance, Senior Financial Advisor at Capital Growth, dvance@growth.com",
+            "Alice Miller, Wealth Advisor at Apex Partners, amiller@apex.org",
+            "Robert Sterling, Financial Consultant at First Asset, rsterling@asset.com",
+        ]
+
+        compositions = set()
+        with patch('generator.services.card_agent.generate_dalle_card', return_value=make_dummy_png()):
+            for prompt in prompts:
+                mock_state = {"name": prompt.split(',')[0], "layout_style": "luxury_gold"}
+                with patch('generator.services.card_agent.reason_card_modifications', return_value=("Created.", mock_state)):
+                    res = process_card_agent_turn(session_id=None, user_message=prompt)
+                    comp = res['card_data'].get('composition_variant')
+                    self.assertIsNotNone(comp)
+                    compositions.add(comp)
+
+        # Diverse composition variants must be generated (more than 1 distinct variant)
+        self.assertGreater(len(compositions), 1)
+
+    def test_conflict_redesign_wins_over_color_intent(self):
+        """When both is_redesign_intent and is_color_intent are True, redesign hierarchy wins.
+        (both layout_style and composition_variant change, not preserved like in color-only intent).
+        """
+        from unittest.mock import patch
+        from generator.models import CardSession
+        from generator.services.card_agent import (
+            detect_color_intent,
+            detect_redesign_intent,
+            process_card_agent_turn,
+        )
+
+        test_msg = "this red design is very bad, change it completely"
+
+        # 1. Verify both intents are True simultaneously
+        self.assertTrue(detect_color_intent(test_msg), "Expected is_color_intent to be True")
+        self.assertTrue(detect_redesign_intent(test_msg), "Expected is_redesign_intent to be True")
+
+        # 2. Set up initial session
+        initial_theme = {'bg_card': [139, 0, 0], 'accent': [255, 69, 0]}
+        session = CardSession.objects.create(
+            current_state={
+                'name': 'Alexander Pierce',
+                'layout_style': 'corner_arcs',
+                'theme': initial_theme,
+                'composition_variant': 'left_monogram_stack',
+            },
+            version=1
+        )
+
+        # Mock GPT output
+        mock_gpt_state = {
+            'name': 'Alexander Pierce',
+            'layout_style': 'cyber_tech',
+            'theme': {'bg_card': [10, 16, 28], 'accent': [0, 229, 255]},
+            'composition_variant': 'centered_hero',
+        }
+
+        with patch('generator.services.card_agent.reason_card_modifications', return_value=("Completely redesigned.", mock_gpt_state)):
+            with patch('generator.services.card_agent.generate_dalle_card', return_value=make_dummy_png()):
+                res = process_card_agent_turn(session_id=str(session.id), user_message=test_msg)
+                session.refresh_from_db()
+
+                # Redesign hierarchy MUST win:
+                # layout_style MUST change (NOT preserved as corner_arcs)
+                self.assertNotEqual(session.current_state['layout_style'], 'corner_arcs')
+                self.assertEqual(session.current_state['layout_style'], 'cyber_tech')
+
+                # composition_variant MUST change (NOT preserved as left_monogram_stack)
+                self.assertNotEqual(session.current_state['composition_variant'], 'left_monogram_stack')
+                self.assertEqual(session.current_state['composition_variant'], 'centered_hero')
+
+                # theme MUST also update to new design
+                self.assertNotEqual(session.current_state['theme'], initial_theme)
+
+    def test_rollback_pre_migration_message_without_composition_variant_key(self):
+        """Pre-migration CardMessage without composition_variant key safely falls back to left_monogram_stack without error."""
+        from unittest.mock import patch
+        from generator.models import CardSession, CardMessage
+        from generator.services.card_agent import process_card_agent_turn
+
+        session = CardSession.objects.create(
+            current_state={
+                'name': 'Hal Jordan',
+                'layout_style': 'luxury_gold',
+                'theme': {'bg_card': [13, 15, 20]},
+                'composition_variant': 'asymmetric_offset',
+            },
+            version=2
+        )
+
+        # Pre-migration card_data: NO composition_variant key at all!
+        CardMessage.objects.create(
+            session=session,
+            role='assistant',
+            content='Old design before migration',
+            card_data={
+                'name': 'Hal Jordan',
+                'layout_style': 'organic_waves',
+                'theme': {'bg_card': [22, 37, 54]},
+                # composition_variant intentionally missing!
+            },
+            version=1
+        )
+
+        mock_gpt_state = {
+            'name': 'Hal Jordan',
+            'layout_style': 'luxury_gold',
+            'composition_variant': 'asymmetric_offset',
+        }
+
+        with patch('generator.services.card_agent.reason_card_modifications', return_value=("Reverted.", mock_gpt_state)):
+            with patch('generator.services.card_agent.generate_dalle_card', return_value=make_dummy_png()):
+                res = process_card_agent_turn(session_id=str(session.id), user_message="bring back previous design")
+                session.refresh_from_db()
+
+                # Restores style from v1
+                self.assertEqual(session.current_state['layout_style'], 'organic_waves')
+                # Safely defaults composition_variant to 'left_monogram_stack' without KeyError/crash
+                self.assertEqual(session.current_state['composition_variant'], 'left_monogram_stack')
+
+    def test_text_safe_zone_and_anti_frame_prompt_with_long_name(self):
+        """Verify prompt with long name includes non-conflicting safe zone and anti-frame mandates."""
+        from generator.services.ai_card_drawer import build_precision_dalle_prompt
+
+        long_name_spec = {
+            'name': 'Dr. Kamal Hossain',
+            'designation': 'Senior Supreme Court Advocate & Constitutional Jurist',
+            'company_name': 'Kamal Hossain & Associates',
+            'layout_style': 'luxury_gold',
+            'composition_variant': 'centered_hero',
+        }
+        prompt = build_precision_dalle_prompt(long_name_spec)
+
+        # 1. Exact text is present
+        self.assertIn("Name: 'Dr. Kamal Hossain'", prompt)
+        self.assertIn("Title: 'Senior Supreme Court Advocate & Constitutional Jurist'", prompt)
+
+        # 2. Text Safe Zone mandate is present
+        self.assertIn("MANDATORY TEXT SAFE ZONE (DO NOT CONFUSE WITH CANVAS SIZE)", prompt)
+        self.assertIn("The card's background graphic, color, and decorative pattern MUST still fill 100%", prompt)
+        self.assertIn("The safe-zone rule applies ONLY to where TEXT CHARACTERS are placed", prompt)
+        self.assertIn("do NOT shrink, frame, or pad the overall card graphic itself", prompt)
+
+        # 3. Canvas Mandate and Anti-Frame reinforcement are present
+        self.assertIn("CANVAS MANDATE: Edge-to-edge flat 2D digital print file filling 100% of the 1536x1024 frame with zero outer margins.", prompt)
+        self.assertIn("ABSOLUTELY NO visible outer canvas border, no white/empty padding strip, no card-within-a-frame appearance", prompt)
+
+    def test_auto_crop_is_noop_on_full_bleed_card(self):
+        """When the card fills the entire image without outer borders, auto_crop_card_surface is a no-op."""
+        from generator.services.ai_card_drawer import auto_crop_card_surface
+        from PIL import Image
+        import io
+
+        # Create a full-bleed 1536x1024 card without outer background borders
+        buf = io.BytesIO()
+        img = Image.new('RGB', (1536, 1024), color=(22, 37, 54))
+        img.save(buf, format='PNG')
+        raw_bytes = buf.getvalue()
+
+        # auto_crop should detect no outer boundary and return raw_bytes unmodified
+        cropped_bytes = auto_crop_card_surface(raw_bytes)
+        self.assertEqual(cropped_bytes, raw_bytes)
+
+
+class VectorCardDrawerTests(TestCase):
+    """
+    Comprehensive tests for the PIL/Pillow-based deterministic vector business card engine.
+    Verifies pixel-perfect 1200x700 rendering, all 4 styles, and all 6 composition variants.
+    """
+
+    def setUp(self):
+        self.sample_card_data = {
+            'name': 'Dr. Mamun Rashid',
+            'designation': 'Lead AI Systems Architect',
+            'company_name': 'Quantum Innovations Ltd',
+            'phone': '+880 1700-123456',
+            'email': 'mamun@quantum-ai.com',
+            'website': 'quantum-ai.com',
+            'address': 'Gulshan 2, Dhaka, Bangladesh',
+            'schedule': 'Sun-Thu 9:00 AM - 6:00 PM',
+        }
+
+    def test_all_styles_and_composition_variants_render_png(self):
+        """All 4 styles x 6 composition variants render valid 1200x700 PNGs without error."""
+        from generator.services.card_drawer import generate_business_card, COMPOSITION_RENDERERS
+        styles = ['cyber_tech', 'corner_arcs', 'luxury_gold', 'organic_waves']
+        variants = list(COMPOSITION_RENDERERS.keys())
+
+        for style in styles:
+            for variant in variants:
+                data = dict(self.sample_card_data)
+                data['layout_style'] = style
+                data['composition_variant'] = variant
+                png_bytes = generate_business_card(data)
+
+                self.assertIsInstance(png_bytes, bytes)
+                self.assertGreater(len(png_bytes), 5000, f"Rendered card too small for {style} - {variant}")
+
+                # Open with PIL to verify valid PNG and exact canvas dimensions
+                img = Image.open(io.BytesIO(png_bytes))
+                self.assertEqual(img.format, 'PNG')
+                self.assertEqual(img.size, (1200, 700))
+
+    def test_turn_uses_vector_engine_and_returns_base64(self):
+        """Card agent turn produces deterministic PNG base64 via vector drawer in sub-second time."""
+        from unittest.mock import patch
+        from generator.services.card_agent import process_card_agent_turn
+
+        mock_state = {
+            'name': 'Alice Smith',
+            'designation': 'Principal Designer',
+            'company_name': 'DesignStudio X',
+            'phone': '+1 555-0199',
+            'email': 'alice@designstudio.io',
+            'layout_style': 'luxury_gold',
+            'composition_variant': 'split_diagonal',
+        }
+
+        with patch('card_project.key_manager.get_active_openai_key', return_value='sk-test-valid-key'):
+            with patch('generator.services.card_agent.reason_card_modifications', return_value=("Card designed successfully.", mock_state)):
+                result = process_card_agent_turn(session_id=None, user_message="Make a card for Alice Smith")
+
+                self.assertEqual(result['status'], 'success')
+                self.assertTrue(result['image_base64'].startswith('data:image/png;base64,'))
+                self.assertEqual(result['card_data']['layout_style'], 'luxury_gold')
+                self.assertEqual(result['card_data']['composition_variant'], 'split_diagonal')
+                self.assertIn('_python_code', result['card_data'])
+
+
+class DynamicCardCoderTests(TestCase):
+    """
+    Tests for ChatGPT Code Interpreter style dynamic AI code generation and sandbox execution.
+    """
+
+    def test_sandbox_execution_produces_1200x700_png(self):
+        """Execution of valid Pillow code in sandbox yields valid 1200x700 PNG."""
+        from generator.services.dynamic_card_coder import build_default_fallback_code, execute_card_code
+        data = {
+            'name': 'Dr. Robert Oppenheimer',
+            'designation': 'Director of Theoretical Physics',
+            'company_name': 'Institute for Advanced Study',
+            'phone': '+1 609-734-8000',
+            'email': 'oppenheimer@ias.edu',
+        }
+        code = build_default_fallback_code(data)
+        png_bytes, working_code = execute_card_code(code)
+
+        self.assertIsInstance(png_bytes, bytes)
+        self.assertGreater(len(png_bytes), 5000)
+
+        img = Image.open(io.BytesIO(png_bytes))
+        self.assertEqual(img.format, 'PNG')
+        self.assertEqual(img.size, (1200, 700))
+        self.assertIn('def draw_visiting_card', working_code)
+
+    def test_sandbox_security_blocks_unauthorized_builtins(self):
+        """Sandbox blocks file system access and system imports."""
+        from generator.services.dynamic_card_coder import execute_card_code
+        unsafe_code = """def draw_visiting_card(fonts):
+    f = open('/tmp/unauthorized.txt', 'w')
+    return Image.new('RGB', (1200, 700))
+"""
+        with self.assertRaises(RuntimeError) as ctx:
+            execute_card_code(unsafe_code, api_key=None, max_retries=0)
+        self.assertIn("NameError", str(ctx.exception))
+
+    def test_self_healing_retry_loop_recovers_from_syntax_error(self):
+        """When code fails, self-healing loop calls healer and produces valid PNG."""
+        from unittest.mock import patch
+        from generator.services.dynamic_card_coder import execute_card_code, build_default_fallback_code
+
+        broken_code = """def draw_visiting_card(fonts):
+    x = 1 / 0  # ZeroDivisionError
+    return Image.new('RGB', (1200, 700))
+"""
+        fixed_code = build_default_fallback_code({'name': 'Healed Card'})
+        with patch('generator.services.dynamic_card_coder.heal_card_code', return_value=fixed_code) as mock_healer:
+            png_bytes, final_code = execute_card_code(broken_code, api_key='sk-test-key', max_retries=1)
+            self.assertTrue(mock_healer.called)
+            self.assertGreater(len(png_bytes), 5000)
+            self.assertIn('Healed Card', final_code)
+
+    def test_multi_turn_code_continuity(self):
+        """Turn 2 refines existing code rather than rewriting it from scratch."""
+        from unittest.mock import patch
+        from generator.models import CardSession
+        from generator.services.card_agent import process_card_agent_turn
+
+        session = CardSession.objects.create(
+            current_state={
+                'name': 'Original Name',
+                'phone': '+1 555-0100',
+                '_python_code': 'def draw_visiting_card(fonts):\n    return Image.new("RGB", (1200, 700), (20, 20, 20))\n'
+            },
+            version=1
+        )
+
+        mock_state = {
+            'name': 'Original Name',
+            'phone': '+1 555-0999',
+            'layout_style': 'organic_waves',
+        }
+
+        with patch('card_project.key_manager.get_active_openai_key', return_value='sk-test-key'):
+            with patch('generator.services.card_agent.reason_card_modifications', return_value=("Updated phone.", mock_state)):
+                with patch('generator.services.card_agent.refine_card_code', return_value='def draw_visiting_card(fonts):\n    return Image.new("RGB", (1200, 700), (30, 30, 30))\n') as mock_refiner:
+                    res = process_card_agent_turn(session_id=str(session.id), user_message="change phone to +1 555-0999")
+                    self.assertTrue(mock_refiner.called)
+                    self.assertEqual(res['status'], 'success')
+                    self.assertTrue(res['image_base64'].startswith('data:image/png;base64,'))
+
+
 
 
 

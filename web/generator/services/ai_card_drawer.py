@@ -8,6 +8,7 @@ import urllib.request
 import urllib.error
 from PIL import Image
 from card_project.notifications import send_openai_error_notification, is_openai_error
+from .card_drawer import generate_business_card
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ CRITICAL DATA INTEGRITY RULES (ZERO TOLERANCE FOR FAKE OR PLACEHOLDER DATA):
    - services: Array of key services or medical specialties [string]. If none, [].
    - social_links: Object with {"linkedin": "", "github": "", "twitter": "", "facebook": "", "instagram": "", "youtube": ""}.
    - monogram: 2-3 letter monogram initials derived from the name or company.
+   - composition_variant: Structural layout key chosen from ["left_monogram_stack", "centered_hero", "split_diagonal", "right_aligned_monogram", "top_banner", "asymmetric_offset"].
    - style_description: Brief description of the visual design style.
 
 2. ZERO HALLUCINATION:
@@ -68,15 +70,55 @@ Return ONLY a JSON object:
     "youtube": string
   },
   "monogram": string,
+  "composition_variant": "left_monogram_stack" | "centered_hero" | "split_diagonal" | "right_aligned_monogram" | "top_banner" | "asymmetric_offset",
   "style_description": string
 }"""
+
+
+COMPOSITION_VARIANTS = {
+    'left_monogram_stack': (
+        "Monogram badge on the far left, all text left-aligned in a vertical stack to its right"
+    ),
+    'centered_hero': (
+        "Name and title centered horizontally at the top, monogram badge centered below as a hero element, contact info centered at the bottom"
+    ),
+    'split_diagonal': (
+        "Card divided diagonally — monogram and branding occupy the top-right triangle, name/title/contact info occupy the bottom-left triangle"
+    ),
+    'right_aligned_monogram': (
+        "All text right-aligned, monogram badge positioned on the far right edge"
+    ),
+    'top_banner': (
+        "Name and title in a bold horizontal banner across the top third, monogram small in a corner, contact info in a separate band at the bottom"
+    ),
+    'asymmetric_offset': (
+        "Monogram badge offset toward one corner (not centered vertically), text block positioned with significant asymmetric whitespace, avoiding a simple two-column split"
+    ),
+}
+
+DEFAULT_COMPOSITION_VARIANT = 'left_monogram_stack'
+
+
+def get_next_fresh_composition(last_variant: str | None = None, seed_text: str | None = None) -> str:
+    """
+    Diverse composition selector fallback when LLM provides no valid composition variant.
+    Cycles through variants or uses seed_text hash to ensure diversity without cross-session database queries.
+    """
+    variants = list(COMPOSITION_VARIANTS.keys())
+    if last_variant and last_variant in variants:
+        idx = (variants.index(last_variant) + 1) % len(variants)
+        return variants[idx]
+    if seed_text:
+        idx = abs(hash(seed_text)) % len(variants)
+        return variants[idx]
+    return DEFAULT_COMPOSITION_VARIANT
 
 
 def normalize_card_data(raw_data: dict) -> dict:
     """
     Standardizes all visiting card fields into a comprehensive, predictable JSON structure:
     - String fields: name, designation, department, company_name, tagline,
-      address, branch, city, postal_code, country, schedule, monogram
+      address, branch, city, postal_code, country, schedule, monogram, composition_variant
     - Multi-value contact arrays: phone, phones, email, emails, websites,
       qualifications, services, fax
     - Social links: social_links dict (linkedin, github, twitter, facebook, instagram, youtube)
@@ -141,6 +183,14 @@ def normalize_card_data(raw_data: dict) -> dict:
         else:
             data['monogram'] = data['name'][:2].upper()
 
+    # 5. Composition Variant normalization (guaranteed valid key from COMPOSITION_VARIANTS)
+    raw_comp = _clean_str(data.get('composition_variant'))
+    if raw_comp in COMPOSITION_VARIANTS:
+        data['composition_variant'] = raw_comp
+    else:
+        # Invalid string/typo or empty -> normalized to empty so intent/fallback logic can detect & apply
+        data['composition_variant'] = ''
+
     return data
 
 
@@ -179,6 +229,7 @@ def analyze_and_design_card(user_prompt: str, api_key: str) -> dict:
         return normalize_card_data({
             'name': user_prompt[:40],
             'monogram': user_prompt[:2].upper(),
+            'composition_variant': get_next_fresh_composition(seed_text=user_prompt),
             'style_description': 'Modern minimalist visiting card design with clean typography and abstract geometric wave'
         })
     except Exception as e:
@@ -188,6 +239,7 @@ def analyze_and_design_card(user_prompt: str, api_key: str) -> dict:
         return normalize_card_data({
             'name': user_prompt[:40],
             'monogram': user_prompt[:2].upper(),
+            'composition_variant': get_next_fresh_composition(seed_text=user_prompt),
             'style_description': 'Modern minimalist visiting card design with clean typography and abstract geometric wave'
         })
 
@@ -247,6 +299,16 @@ def build_precision_dalle_prompt(card_spec: dict) -> str:
     layout_style = spec.get('layout_style')
     fallback_style = spec.get('style_description') or 'Sleek modern business card with bold typography and abstract vector accents'
     style = LAYOUT_STYLE_DESCRIPTIONS.get(layout_style, fallback_style)
+
+    # Mandatory Composition instruction with early emphasis
+    comp_variant = spec.get('composition_variant')
+    if comp_variant not in COMPOSITION_VARIANTS:
+        comp_variant = DEFAULT_COMPOSITION_VARIANT
+    comp_desc = COMPOSITION_VARIANTS[comp_variant]
+    comp_mandate = (
+        f"MANDATORY COMPOSITION: {comp_desc}. "
+        f"Do not default to a simple left-monogram-right-text layout unless this composition explicitly describes it."
+    )
 
     # Mandatory Color instruction with early emphasis
     theme = spec.get('theme') or {}
@@ -341,16 +403,32 @@ def build_precision_dalle_prompt(card_spec: dict) -> str:
 
     blacklist_text = "; ".join(blacklist)
 
+    text_safe_zone = (
+        "MANDATORY TEXT SAFE ZONE (DO NOT CONFUSE WITH CANVAS SIZE): The card's "
+        "background graphic, color, and decorative pattern MUST still fill 100% of "
+        "the entire 1536x1024 canvas edge-to-edge with ZERO visible outer border, "
+        "padding, letterboxing, or secondary background color surrounding the card "
+        "— the card IS the full canvas, exactly as before. The safe-zone rule "
+        "applies ONLY to where TEXT CHARACTERS are placed within that full-bleed "
+        "canvas: no text or monogram should be positioned so close to the edge "
+        "that a character gets clipped or cut off. If text would overflow, reduce "
+        "its font size — do NOT shrink, frame, or pad the overall card graphic "
+        "itself to create empty space around it."
+    )
+
     prompt = (
         f"A full-bleed flat digital graphic layout, exact 1536x1024 rectangular wallpaper canvas. "
+        f"{comp_mandate} "
         f"{color_instruction}"
         f"{phone_mandate}"
         f"Sharp 90-degree square corners filling 100% of the entire rectangle from corner (0,0) to (1536,1024) edge-to-edge. "
         f"{style}. "
         f"Prominent stylish monogram emblem with initials '{monogram}'. "
         f"EXACT TEXT TO RENDER (AND NOTHING ELSE): {whitelist_text}. "
+        f"{text_safe_zone} "
         f"STRICT PROHIBITIONS: {blacklist_text}. ABSOLUTELY ZERO placeholder text, dummy numbers, or fake contact info! "
         f"CANVAS MANDATE: Edge-to-edge flat 2D digital print file filling 100% of the 1536x1024 frame with zero outer margins. "
+        f"ABSOLUTELY NO visible outer canvas border, no white/empty padding strip, no card-within-a-frame appearance — any background color, pattern, or texture must extend fully to all four edges of the image. "
         f"ABSOLUTELY NO 3D mockup, NO perspective angle, NO table, NO desk, NO floor, NO shadows outside, NO rounded corners, NO background surface. The entire 1536x1024 image file IS the card surface."
     )
     return prompt
@@ -597,26 +675,21 @@ def generate_hybrid_business_card(prompt: str) -> tuple[bytes, dict]:
         designation=card_spec.get('designation', ''),
         company=card_spec.get('company_name', '') or card_spec.get('address', '')
     )
+    inferred_comp = card_spec.get('composition_variant')
+    if not inferred_comp or inferred_comp not in COMPOSITION_VARIANTS:
+        inferred_comp = get_next_fresh_composition(seed_text=prompt)
     theme = card_spec.get('theme') or DEFAULT_THEMES.get(inferred_style, DEFAULT_THEMES['organic_waves'])
     card_spec['layout_style'] = inferred_style
+    card_spec['composition_variant'] = inferred_comp
     card_spec['theme'] = theme
 
     card_data = normalize_card_data(card_spec)
     card_data['layout_style'] = inferred_style
+    card_data['composition_variant'] = inferred_comp
     card_data['theme'] = theme
 
-    dalle_prompt = card_spec.get('dalle_prompt') or build_precision_dalle_prompt(card_data)
-
-    logger.info("Step 1: Generating bespoke visiting card via OpenAI image model...")
-    raw_bytes = generate_dalle_card(dalle_prompt, api_key)
-
-    if not raw_bytes:
-        logger.error(f"OpenAI image generation failed for prompt: {prompt}")
-        err_msg = "AI card generation failed: OpenAI image generation returned no image."
-        send_openai_error_notification(err_msg)
-        raise RuntimeError(err_msg)
-
-    card_bytes = auto_crop_card_surface(raw_bytes)
+    logger.info("Step 1: Rendering high-precision vector visiting card based on AI creative decisions...")
+    card_bytes = generate_business_card(card_data)
     logger.info("Step 2: Successfully produced pure visiting card!")
     return card_bytes, card_data
 

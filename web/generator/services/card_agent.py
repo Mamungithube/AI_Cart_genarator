@@ -16,6 +16,15 @@ from .ai_card_drawer import (
     generate_dalle_card,
     auto_crop_card_surface,
     normalize_card_data,
+    COMPOSITION_VARIANTS,
+    DEFAULT_COMPOSITION_VARIANT,
+    get_next_fresh_composition,
+)
+from .card_drawer import generate_business_card
+from .dynamic_card_coder import (
+    generate_card_code,
+    refine_card_code,
+    execute_card_code,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,17 +46,20 @@ YOUR TASK & CORE RULES:
      * CREATIVE / DESIGN / ART / PHOTO / MARKETING / FOOD: Choose "organic_waves" (fluid organic ribbons, warm gold/navy).
      * CORPORATE / CONSULTANT / AGENCY / ARCHITECT / BUSINESS / MEDICAL: Choose "corner_arcs" (bold concentric geometric arcs).
    - If profession or industry is not clearly specified, choose creatively among the 4 styles so new cards are diverse and never repetitive duplicates!
+   - In addition, independently select the best-matching "composition_variant" based on profession/style among:
+     ["left_monogram_stack", "centered_hero", "split_diagonal", "right_aligned_monogram", "top_banner", "asymmetric_offset"]
+     so consecutive new cards are diverse not only in color and pattern, but fundamentally distinct in structural composition!
 
 1. CRITICAL RULE: DESIGN STABILITY ON TEXT EDITS (DO NOT CHANGE DESIGN RANDOMLY!):
    - When a user updates or adds text fields (e.g. "change name to Dodul ch.", "add phone 012555555555", "change designation", "add email", "add my company name ..."):
-     * YOU MUST PRESERVE the existing "layout_style" and "theme" EXACTLY as they are in "current_card_state"!
-     * NEVER change the visual layout style or colors when only text/contact info/company name is being updated or added!
+     * YOU MUST PRESERVE the existing "layout_style", "theme", AND "composition_variant" EXACTLY as they are in "current_card_state"!
+     * NEVER change the visual layout style, colors, or structural composition when only text/contact info/company name is being updated or added!
      * Compute "monogram" automatically from the initials of the new name if the name changed (e.g. "Dodul ch." -> "DO").
 
 2. CRITICAL RULE: ROLLBACK & RESTORING PREVIOUS DESIGNS:
    - If the user asks to revert or bring back an earlier design (e.g. "bring back the previous design", "revert to previous design", "restore earlier version", "why did you change the design", "undo design change"):
      * If the user names a specific style (e.g. "organic waves", "corner arcs", "cyber tech", "luxury gold"), set layout_style to that style.
-     * Otherwise, inspect "recent_conversation_history", find the earlier version before the redesign, and restore its "layout_style" and "theme"!
+     * Otherwise, inspect "recent_conversation_history", find the earlier version before the redesign, and restore its "layout_style", "theme", and "composition_variant"!
      * Keep the user's latest text fields (name, phone, company, etc.) intact.
      * In "assistant_message", clearly confirm in English that you have restored their preferred previous design while keeping their updated contact info.
 
@@ -57,15 +69,21 @@ YOUR TASK & CORE RULES:
    - "cyber_tech": Circuit trace grid, neon cyan glow brackets, glowing hexagon monogram badge, tech divider line (Midnight Obsidian & Cyan by default).
    - "luxury_gold": Double hairline gold borders with corner notches, delicate circular crest emblem with monogram, high-fashion typography (Matte Obsidian Black & Champagne Gold).
 
-4. EXPLICIT VISUAL REDESIGN:
-   - If the user asks for "corner arcs", set "layout_style" to "corner_arcs".
-   - If the user asks for "organic waves", set "layout_style" to "organic_waves".
-   - If the user asks for "cyber tech", set "layout_style" to "cyber_tech".
-   - If the user asks for "luxury gold", set "layout_style" to "luxury_gold".
-   - ONLY change "layout_style" when the user explicitly requests a design change.
-   - ONLY change "theme" when the user explicitly asks to change colors (e.g. "make it red", "change background to black", "change accent to green").
+4. SUPPORTED COMPOSITION VARIANTS ("composition_variant"):
+   - "left_monogram_stack": Monogram badge on the far left, all text left-aligned in a vertical stack to its right.
+   - "centered_hero": Name and title centered horizontally at the top, monogram badge centered below as a hero element, contact info centered at the bottom.
+   - "split_diagonal": Card divided diagonally — monogram and branding occupy the top-right triangle, name/title/contact info occupy the bottom-left triangle.
+   - "right_aligned_monogram": All text right-aligned, monogram badge positioned on the far right edge.
+   - "top_banner": Name and title in a bold horizontal banner across the top third, monogram small in a corner, contact info in a separate band at the bottom.
+   - "asymmetric_offset": Monogram badge offset toward one corner (not centered vertically), text block positioned with significant asymmetric whitespace, avoiding a simple two-column split.
 
-5. THEME COLOR SPECIFICATION:
+5. VISUAL REDESIGN & DISSATISFACTION:
+   - If the user asks for a specific style ("corner arcs", "organic waves", "cyber tech", "luxury gold"), set "layout_style" to that style.
+   - If the user asks for a redesign or gives negative/dissatisfaction feedback (e.g. "redesign this", "different design", "fresh look", "this design is very bad", "i don't like it", "looks bad", "hate this design", "not what i wanted"):
+     * You MUST choose a DIFFERENT "layout_style", a DIFFERENT "composition_variant" (chosen from the 6 variants), and an appropriate "theme" to provide a truly fresh, upgraded look!
+   - ONLY change "theme" when the user explicitly asks to change colors (e.g. "make it red", "change background to black", "change accent to green") or during a redesign.
+
+6. THEME COLOR SPECIFICATION:
    - Each theme has RGB arrays:
      {
        "bg_card": [r, g, b],
@@ -84,7 +102,7 @@ YOUR TASK & CORE RULES:
    - Default for luxury_gold:
      bg_card: [13, 15, 20], accent: [212, 175, 55], accent_secondary: [245, 215, 127], text_primary: [255, 255, 255], text_secondary: [212, 175, 55], text_muted: [205, 210, 220]
 
-6. ZERO HALLUCINATION & COMPREHENSIVE VISITING CARD DATA SCHEMA:
+7. ZERO HALLUCINATION & COMPREHENSIVE VISITING CARD DATA SCHEMA:
    - Never invent dummy phone numbers, fake emails, or placeholder addresses.
    - All possible data on a professional visiting card is captured in "card_state":
      * "name": Full name string.
@@ -105,9 +123,10 @@ YOUR TASK & CORE RULES:
      * "services": Array of key services or medical specialties [string]. If none, [].
      * "social_links": Object with {"linkedin": "", "github": "", "twitter": "", "facebook": "", "instagram": "", "youtube": ""}.
      * "monogram": 2-3 letter monogram initials (e.g. "MM").
+     * "composition_variant": One of "left_monogram_stack", "centered_hero", "split_diagonal", "right_aligned_monogram", "top_banner", "asymmetric_offset".
      * "theme": Color theme dictionary with RGB values.
 
-7. LANGUAGE & ASSISTANT MESSAGE RULE:
+8. LANGUAGE & ASSISTANT MESSAGE RULE:
    - Always write "assistant_message" in fluent, professional, courteous English (e.g., "I've updated your visiting card information and preserved your existing layout style.").
    - Even if the user instruction is in another language, always deliver the assistant explanation in English.
 
@@ -116,6 +135,7 @@ Return ONLY a JSON object:
   "assistant_message": string,
   "card_state": {
     "layout_style": "organic_waves" | "corner_arcs" | "cyber_tech" | "luxury_gold",
+    "composition_variant": "left_monogram_stack" | "centered_hero" | "split_diagonal" | "right_aligned_monogram" | "top_banner" | "asymmetric_offset",
     "name": string,
     "designation": string,
     "department": string,
@@ -193,6 +213,7 @@ def reason_card_modifications(current_state: dict, history_list: list, user_mess
             logger.info(f"Agent reasoning raw parsed assistant_message: {assistant_msg}")
             logger.info(f"Agent reasoning raw parsed card_state theme: {new_state.get('theme')}")
             logger.info(f"Agent reasoning raw parsed layout_style: {new_state.get('layout_style')}")
+            logger.info(f"Agent reasoning raw parsed composition_variant: {new_state.get('composition_variant')}")
             return assistant_msg, new_state
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace") if hasattr(e, 'read') else str(e)
@@ -269,6 +290,28 @@ def detect_style_intent(text: str) -> str | None:
 
     return None
 
+def detect_composition_intent(text: str) -> str | None:
+    if not text:
+        return None
+    cleaned = re.sub(r'[\w.+-]+@[\w-]+\.[\w.-]+', ' ', text)
+    cleaned = re.sub(r'https?://\S+|www\.\S+', ' ', cleaned)
+    t = cleaned.lower()
+
+    if re.search(r'\b(?:centered[\s_-]?hero|centered|center|centre|middle)\b', t) or 'সেন্টার' in t or 'মাঝখানে' in t:
+        return 'centered_hero'
+    if re.search(r'\b(?:left[\s_-]?monogram(?:[\s_-]?stack)?|left[\s_-]?aligned|left[\s_-]?side|on the left)\b', t) or 'বাম পাশে' in t or 'বামে' in t:
+        return 'left_monogram_stack'
+    if re.search(r'\b(?:right[\s_-]?aligned(?:[\s_-]?monogram)?|right[\s_-]?side|on the right)\b', t) or 'ডান পাশে' in t or 'ডানে' in t:
+        return 'right_aligned_monogram'
+    if re.search(r'\b(?:split[\s_-]?diagonal|diagonal|split)\b', t) or 'ডায়াগোনাল' in t or 'কোনাকুনি' in t:
+        return 'split_diagonal'
+    if re.search(r'\b(?:top[\s_-]?banner|banner|header)\b', t) or 'ব্যানার' in t or 'টপ' in t:
+        return 'top_banner'
+    if re.search(r'\b(?:asymmetric[\s_-]?offset|asymmetric|offset)\b', t) or 'অফসেট' in t:
+        return 'asymmetric_offset'
+    return None
+
+
 def detect_rollback_intent(text: str) -> bool:
     t = text.lower()
     rollback_keywords = [
@@ -300,9 +343,64 @@ def detect_color_intent(text: str) -> bool:
     if re.search(rf'\b(?:make|turn|paint|change|switch)\s+(?:it\s+)?(?:to\s+)?{color_names}\b', t):
         return True
 
-    # 3. Explicit color phrase: "<color> color", "<color> background", "<color> theme"
-    if re.search(rf'\b{color_names}\s+(?:color|colour|bg|background|theme|palette|accent|shade|tone|tint)\b', t):
+    # 3. Explicit color phrase: "<color> color", "<color> background", "<color> theme", "<color> design"
+    if re.search(rf'\b{color_names}\s+(?:color|colour|bg|background|theme|palette|accent|shade|tone|tint|design)\b', t):
         return True
+
+    return False
+
+def detect_redesign_intent(text: str) -> bool:
+    if not text:
+        return False
+    # Strip URLs and emails
+    cleaned = re.sub(r'[\w.+-]+@[\w-]+\.[\w.-]+', ' ', text)
+    cleaned = re.sub(r'https?://\S+|www\.\S+', ' ', cleaned)
+    t = cleaned.lower()
+
+    # Bengali redesign & dissatisfaction phrases
+    bengali_redesign_keywords = [
+        'ডিজাইন চ্যাঞ্জ', 'ডিজাইন চেঞ্জ', 'ডিজাইন পরিবর্তন', 'ডিজাইন বদল', 'টেমপ্লেট পরিবর্তন',
+        'টেমপ্লেট চ্যাঞ্জ', 'টেমপ্লেট চেঞ্জ', 'অন্য ডিজাইন', 'অন্য টেমপ্লেট', 'নতুন ডিজাইন',
+        'নতুন লুক', 'নতুন টেমপ্লেট', 'স্টাইল চ্যাঞ্জ', 'স্টাইল চেঞ্জ', 'স্টাইল পরিবর্তন',
+        'লেআউট চ্যাঞ্জ', 'লেআউট চেঞ্জ', 'লেআউট পরিবর্তন', 'ডিজাইন ভালো না', 'ডিজাইন ফালতু',
+        'একই ডিজাইন', 'একই টেমপ্লেট', 'ডিজাইন পছন্দ হয়নি', 'অন্য স্টাইল', 'ডিজাইন বদলাও',
+        'টেমপ্লেট বদলাও', 'চ্যাঞ্জ কর', 'চেঞ্জ কর', 'পরিবর্তন কর'
+    ]
+    if any(k in t for k in bengali_redesign_keywords):
+        return True
+
+    # 1. Explicit redesign phrases
+    redesign_patterns = [
+        r'\bredesign\b',
+        r'\bdifferent\s+(?:design|template|layout|style|look)\b',
+        r'\b(?:new|fresh)\s+(?:look|design|template|layout|style)\b',
+        r'\bchange\s+(?:the\s+)?(?:design|template|layout|style)(?:\s+completely)?\b',
+        r'\bswitch\s+(?:the\s+)?(?:design|template|layout|style)\b',
+        r'\bchange\s+(?:it\s+)?(?:completely|totally|entirely)\b',
+        r'\bmake\s+it\s+look\s+different\b',
+        r'\bsame\s+(?:design|template|layout)\b',
+        r'\bnot\s+changing\s+(?:the\s+)?(?:design|template|layout)\b',
+    ]
+    for pat in redesign_patterns:
+        if re.search(pat, t):
+            return True
+
+    # 2. Negative feedback / dissatisfaction phrases
+    dissatisfaction_patterns = [
+        r'\bthis\s+(?:[\w-]+\s+)?design\s+is\s+(?:very\s+)?bad\b',
+        r'\bi\s+don\'?t\s+like\s+(?:this|it)\b',
+        r'\bnot\s+good\b',
+        r'\blooks\s+bad\b',
+        r'\bdon\'?t\s+like\s+(?:the\s+)?design\b',
+        r'\bhate\s+this\s+design\b',
+        r'\bthis\s+(?:[\w-]+\s+)?looks\s+bad\b',
+        r'\bnot\s+what\s+i\s+wanted\b',
+        r'\bcan\s+you\s+make\s+it\s+better\b',
+        r'\bthis\s+isn\'?t\s+good\b',
+    ]
+    for pat in dissatisfaction_patterns:
+        if re.search(pat, t):
+            return True
 
     return False
 
@@ -409,13 +507,16 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
 
     # 4. Deterministic State Preservation, Explicit Redesign, and Rollback
     explicit_style = detect_style_intent(user_message)
+    explicit_composition = detect_composition_intent(user_message)
+    is_redesign = detect_redesign_intent(user_message)
     is_rollback = detect_rollback_intent(user_message)
     is_color_intent = detect_color_intent(user_message)
 
     logger.info(
         f"Session {session.id} v{version} intent analysis: "
         f"is_new_session={is_new_session}, explicit_style={explicit_style}, "
-        f"is_color_intent={is_color_intent}, is_rollback={is_rollback}"
+        f"explicit_composition={explicit_composition}, "
+        f"is_redesign={is_redesign}, is_color_intent={is_color_intent}, is_rollback={is_rollback}"
     )
 
     if is_rollback and not is_new_session:
@@ -423,62 +524,148 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
         if explicit_style:
             updated_state['layout_style'] = explicit_style
             updated_state['theme'] = DEFAULT_THEMES.get(explicit_style, DEFAULT_THEMES['organic_waves'])
+            restored_comp = False
+            for m in history_messages:
+                prev_data = m.card_data if isinstance(m.card_data, dict) else {}
+                if prev_data.get('layout_style') == explicit_style:
+                    prev_comp = prev_data.get('composition_variant')
+                    updated_state['composition_variant'] = prev_comp if (prev_comp and prev_comp in COMPOSITION_VARIANTS) else DEFAULT_COMPOSITION_VARIANT
+                    restored_comp = True
+                    break
+            if not restored_comp:
+                updated_state['composition_variant'] = current_state.get('composition_variant', DEFAULT_COMPOSITION_VARIANT)
         else:
             restored = False
             for m in history_messages:
-                prev_data = m.card_data or {}
+                prev_data = m.card_data if isinstance(m.card_data, dict) else {}
                 prev_style = prev_data.get('layout_style')
-                if prev_style and prev_style != current_state.get('layout_style'):
-                    updated_state['layout_style'] = prev_style
+                prev_comp = prev_data.get('composition_variant')
+                if (prev_style and prev_style != current_state.get('layout_style')) or \
+                   (prev_comp and prev_comp != current_state.get('composition_variant')):
+                    updated_state['layout_style'] = prev_style or current_state.get('layout_style', 'organic_waves')
                     if prev_data.get('theme'):
                         updated_state['theme'] = prev_data['theme']
+                    # Safe fallback for pre-migration card_data missing composition_variant
+                    updated_state['composition_variant'] = prev_comp if (prev_comp and prev_comp in COMPOSITION_VARIANTS) else DEFAULT_COMPOSITION_VARIANT
                     restored = True
                     break
             if not restored:
                 updated_state['layout_style'] = 'organic_waves'
                 updated_state['theme'] = DEFAULT_THEMES['organic_waves']
-    elif explicit_style:
-        # Explicit style change requested by user
-        updated_state['layout_style'] = explicit_style
-        if is_color_intent and updated_state.get('theme'):
-            pass
-        elif not updated_state.get('theme') or updated_state.get('theme') == current_state.get('theme'):
-            updated_state['theme'] = DEFAULT_THEMES.get(explicit_style, DEFAULT_THEMES['corner_arcs'])
+                updated_state['composition_variant'] = DEFAULT_COMPOSITION_VARIANT
     elif is_new_session:
         # BRAND NEW CARD (No session_id passed):
-        # 1. Prioritize GPT's intelligent layout selection based on prompt/profession
-        gpt_style = updated_state.get('layout_style')
-        if gpt_style and gpt_style in DEFAULT_THEMES:
-            chosen_style = gpt_style
-            # Ensure theme aligns with the chosen style if not already provided or if empty
+        # 1. Prioritize explicit_style or GPT's intelligent layout selection based on prompt/profession
+        if explicit_style:
+            chosen_style = explicit_style
+            updated_state['layout_style'] = chosen_style
             if not isinstance(updated_state.get('theme'), dict) or not updated_state.get('theme').get('bg_card'):
                 updated_state['theme'] = DEFAULT_THEMES.get(chosen_style, DEFAULT_THEMES['organic_waves'])
         else:
-            # Fallback only when GPT provided no style or an invalid value
-            chosen_style = get_next_fresh_layout_style(seed_text=user_message)
-            updated_state['layout_style'] = chosen_style
-            updated_state['theme'] = DEFAULT_THEMES.get(chosen_style, DEFAULT_THEMES['luxury_gold'])
+            gpt_style = updated_state.get('layout_style')
+            if gpt_style and gpt_style in DEFAULT_THEMES:
+                chosen_style = gpt_style
+                if not isinstance(updated_state.get('theme'), dict) or not updated_state.get('theme').get('bg_card'):
+                    updated_state['theme'] = DEFAULT_THEMES.get(chosen_style, DEFAULT_THEMES['organic_waves'])
+            else:
+                chosen_style = get_next_fresh_layout_style(seed_text=user_message)
+                updated_state['layout_style'] = chosen_style
+                updated_state['theme'] = DEFAULT_THEMES.get(chosen_style, DEFAULT_THEMES['luxury_gold'])
+
+        # 2. Composition variant
+        if explicit_composition:
+            updated_state['composition_variant'] = explicit_composition
+        else:
+            gpt_comp = updated_state.get('composition_variant')
+            if gpt_comp and gpt_comp in COMPOSITION_VARIANTS:
+                updated_state['composition_variant'] = gpt_comp
+            else:
+                updated_state['composition_variant'] = get_next_fresh_composition(seed_text=user_message)
+    elif is_redesign:
+        # 2. is_redesign (Priority 2: generic redesign / dissatisfaction / change design request)
+        logger.info(f"Session {session.id} v{version}: Redesign / dissatisfaction intent detected. Bypassing deterministic override.")
+
+        # Layout style
+        current_style = current_state.get('layout_style', 'corner_arcs')
+        styles = ['organic_waves', 'cyber_tech', 'luxury_gold', 'corner_arcs']
+        if explicit_style:
+            updated_state['layout_style'] = explicit_style
+        else:
+            gpt_style = updated_state.get('layout_style')
+            if gpt_style and gpt_style in DEFAULT_THEMES and gpt_style != current_style:
+                updated_state['layout_style'] = gpt_style
+            else:
+                if current_style in styles:
+                    next_idx = (styles.index(current_style) + 1) % len(styles)
+                    updated_state['layout_style'] = styles[next_idx]
+                else:
+                    updated_state['layout_style'] = get_next_fresh_layout_style(seed_text=user_message)
+
+        # Composition variant
+        current_comp = current_state.get('composition_variant', DEFAULT_COMPOSITION_VARIANT)
+        if explicit_composition:
+            updated_state['composition_variant'] = explicit_composition
+        else:
+            gpt_comp = updated_state.get('composition_variant')
+            if gpt_comp and gpt_comp in COMPOSITION_VARIANTS and gpt_comp != current_comp:
+                updated_state['composition_variant'] = gpt_comp
+            else:
+                updated_state['composition_variant'] = get_next_fresh_composition(last_variant=current_comp)
+
+        # Theme
+        if updated_state.get('theme') and updated_state.get('theme') != current_state.get('theme'):
+            pass
+        else:
+            updated_state['theme'] = DEFAULT_THEMES.get(updated_state['layout_style'], DEFAULT_THEMES['organic_waves'])
+    elif explicit_style or explicit_composition:
+        # 3. Explicit style or composition request without full redesign
+        if explicit_style:
+            updated_state['layout_style'] = explicit_style
+            if not is_color_intent or not updated_state.get('theme') or updated_state.get('theme') == current_state.get('theme'):
+                updated_state['theme'] = DEFAULT_THEMES.get(explicit_style, DEFAULT_THEMES['corner_arcs'])
+        else:
+            updated_state['layout_style'] = current_state.get('layout_style', 'corner_arcs')
+
+        if explicit_composition:
+            updated_state['composition_variant'] = explicit_composition
+        else:
+            updated_state['composition_variant'] = current_state.get('composition_variant', DEFAULT_COMPOSITION_VARIANT)
+    elif is_color_intent:
+        # 4. is_color_intent (Priority 4: specific color change instruction like "make it red")
+        # layout_style and composition_variant strictly preserved
+        updated_state['layout_style'] = current_state.get('layout_style', 'corner_arcs')
+        updated_state['composition_variant'] = current_state.get('composition_variant', DEFAULT_COMPOSITION_VARIANT)
+        if updated_state.get('theme') and updated_state.get('theme') != current_state.get('theme'):
+            logger.info(f"Session {session.id} v{version}: Honoring color change intent: {updated_state.get('theme')}")
+        elif current_state.get('theme'):
+            logger.info(f"Session {session.id} v{version}: Preserving previous theme {current_state.get('theme')}")
+            updated_state['theme'] = current_state['theme']
+        else:
+            updated_state['theme'] = DEFAULT_THEMES.get(updated_state['layout_style'], DEFAULT_THEMES['organic_waves'])
     else:
-        # ONGOING SESSION (session_id passed):
-        # 1. Deterministic layout preservation:
-        # Layout style MUST strictly come from session.current_state unless explicit_style was requested
+        # 5. Plain text edits (Priority 5: name, phone, company, etc.)
+        # layout_style, theme, and composition_variant strictly preserved
         if current_state.get('layout_style'):
             logger.info(f"Session {session.id} v{version}: Deterministic override: strictly preserving layout_style '{current_state['layout_style']}'")
             updated_state['layout_style'] = current_state['layout_style']
         elif not updated_state.get('layout_style'):
             updated_state['layout_style'] = 'corner_arcs'
 
-        # 2. Deterministic theme preservation:
-        # If user explicitly requested color/theme change AND GPT produced an updated theme, adopt it.
-        # OTHERWISE (including text-only edits, adding company name, changing contact info),
-        # STRICTLY preserve current_state['theme'] from previous turn.
-        if is_color_intent and updated_state.get('theme') and updated_state.get('theme') != current_state.get('theme'):
-            logger.info(f"Session {session.id} v{version}: Honoring color change intent: {updated_state.get('theme')}")
-        elif current_state.get('theme'):
+        if current_state.get('theme'):
             logger.info(f"Session {session.id} v{version}: Deterministic override: strictly preserving previous theme {current_state.get('theme')}")
             updated_state['theme'] = current_state['theme']
         elif not updated_state.get('theme'):
             updated_state['theme'] = DEFAULT_THEMES.get(updated_state['layout_style'], DEFAULT_THEMES['organic_waves'])
+
+        if current_state.get('composition_variant'):
+            logger.info(f"Session {session.id} v{version}: Deterministic override: strictly preserving composition_variant '{current_state['composition_variant']}'")
+            updated_state['composition_variant'] = current_state['composition_variant']
+        else:
+            updated_state['composition_variant'] = DEFAULT_COMPOSITION_VARIANT
+
+    # Strictly ensure composition_variant is a valid key from COMPOSITION_VARIANTS
+    if not updated_state.get('composition_variant') or updated_state.get('composition_variant') not in COMPOSITION_VARIANTS:
+        updated_state['composition_variant'] = DEFAULT_COMPOSITION_VARIANT
 
     # Compute monogram if empty
     if not updated_state.get('monogram') and updated_state.get('name'):
@@ -488,28 +675,30 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
         else:
             updated_state['monogram'] = updated_state['name'][:2].upper()
 
-    # 5. Generate AI Visiting Card Image (Always AI image model - no vector fallback)
+    # 5. Generate Visiting Card via Precision Vector Engine (Controlled by AI Decisions)
     if not api_key:
         err_msg = "OpenAI API key not configured — card generation requires an active key."
         send_openai_error_notification(err_msg)
         raise ValueError(err_msg)
 
     t_img_start = time.time()
-    dalle_prompt = build_precision_dalle_prompt(updated_state)
-    raw_bytes = generate_dalle_card(dalle_prompt, api_key)
-    logger.info(f"Image generation took: {time.time() - t_img_start:.2f}s")
+    existing_code = current_state.get('_python_code')
+    if existing_code and not is_new_session and not is_redesign:
+        try:
+            refine_card_code(existing_code, updated_state, user_message, api_key)
+        except Exception as ref_err:
+            logger.debug(f"Refinement pass: {ref_err}")
 
-    if not raw_bytes:
-        logger.error(f"AI card image generation failed for session {session.id}")
-        err_msg = "AI card generation failed: OpenAI image generation returned no image."
-        send_openai_error_notification(err_msg)
-        raise RuntimeError(err_msg)
+    try:
+        image_bytes = generate_business_card(updated_state)
+        updated_state['_python_code'] = f"# Visiting Card Vector Engine: {updated_state.get('layout_style')} / {updated_state.get('composition_variant')}"
+        logger.info(f"Vector card rendering took: {time.time() - t_img_start:.3f}s")
+    except Exception as e:
+        logger.error(f"Vector card rendering failed for session {session.id}: {e}")
+        send_openai_error_notification(f"AI card rendering failed: {e}")
+        raise RuntimeError(f"AI card rendering failed: {e}")
 
-    t_crop_start = time.time()
-    image_bytes = auto_crop_card_surface(raw_bytes)
-    logger.info(f"Auto-crop took: {time.time() - t_crop_start:.2f}s")
-
-    # 5. Convert Image to Base64 (In-memory, no disk file saving)
+    # 6. Convert Image to Base64 (In-memory, no disk file saving)
     b64_str = base64.b64encode(image_bytes).decode('utf-8')
     image_base64 = f"data:image/png;base64,{b64_str}"
 
