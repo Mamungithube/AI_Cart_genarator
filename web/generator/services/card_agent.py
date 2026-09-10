@@ -12,8 +12,8 @@ from .ai_card_drawer import (
     build_precision_dalle_prompt,
     generate_dalle_card,
     auto_crop_card_surface,
+    normalize_card_data,
 )
-from .card_drawer import generate_business_card
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +36,9 @@ YOUR TASK & CORE RULES:
    - If profession or industry is not clearly specified, choose creatively among the 4 styles so new cards are diverse and never repetitive duplicates!
 
 1. CRITICAL RULE: DESIGN STABILITY ON TEXT EDITS (DO NOT CHANGE DESIGN RANDOMLY!):
-   - When a user updates text fields (e.g. "change name to Dodul ch.", "add phone 012555555555", "change designation", "add email"):
+   - When a user updates or adds text fields (e.g. "change name to Dodul ch.", "add phone 012555555555", "change designation", "add email", "add my company name ..."):
      * YOU MUST PRESERVE the existing "layout_style" and "theme" EXACTLY as they are in "current_card_state"!
-     * NEVER change the visual layout style or colors when only text/contact info is being updated or added!
+     * NEVER change the visual layout style or colors when only text/contact info/company name is being updated or added!
      * Compute "monogram" automatically from the initials of the new name if the name changed (e.g. "Dodul ch." -> "DO").
 
 2. CRITICAL RULE: ROLLBACK & RESTORING PREVIOUS DESIGNS:
@@ -81,9 +81,28 @@ YOUR TASK & CORE RULES:
    - Default for luxury_gold:
      bg_card: [13, 15, 20], accent: [212, 175, 55], accent_secondary: [245, 215, 127], text_primary: [255, 255, 255], text_secondary: [212, 175, 55], text_muted: [205, 210, 220]
 
-6. ZERO HALLUCINATION:
+6. ZERO HALLUCINATION & COMPREHENSIVE VISITING CARD DATA SCHEMA:
    - Never invent dummy phone numbers, fake emails, or placeholder addresses.
-   - If a contact field is not provided, keep it empty "".
+   - All possible data on a professional visiting card is captured in "card_state":
+     * "name": Full name string.
+     * "designation": Professional title / role string.
+     * "department": Department or division string.
+     * "qualifications": Array of degrees / certifications [string] (e.g. ["MBBS (DMC)", "FCPS", "PhD in AI"]). If none, [].
+     * "company_name": Organization, company, or clinic name string.
+     * "tagline": Company slogan, motto, or subtitle string.
+     * "phone": Array of phone numbers [string] (e.g. ["+880 1837000000", "+880 1700111222"]). If none, [].
+     * "email": Array of email addresses [string] (e.g. ["mamun@techvision.com", "info@mamun.dev"]). If none, [].
+     * "website": Array of website URLs [string] (e.g. ["https://www.techvision.com.bd"]). If none, [].
+     * "address": Full street or chamber address string.
+     * "branch": Branch, chamber, or office location string.
+     * "city": City or district string.
+     * "postal_code": Postal/ZIP code string.
+     * "country": Country string.
+     * "schedule": Working hours, clinic schedule, or visiting hours string.
+     * "services": Array of key services or medical specialties [string]. If none, [].
+     * "social_links": Object with {"linkedin": "", "github": "", "twitter": "", "facebook": "", "instagram": "", "youtube": ""}.
+     * "monogram": 2-3 letter monogram initials (e.g. "MM").
+     * "theme": Color theme dictionary with RGB values.
 
 7. LANGUAGE & ASSISTANT MESSAGE RULE:
    - Always write "assistant_message" in fluent, professional, courteous English (e.g., "I've updated your visiting card information and preserved your existing layout style.").
@@ -96,12 +115,28 @@ Return ONLY a JSON object:
     "layout_style": "organic_waves" | "corner_arcs" | "cyber_tech" | "luxury_gold",
     "name": string,
     "designation": string,
+    "department": string,
+    "qualifications": [string],
     "company_name": string,
-    "phone": string,
-    "email": string,
-    "website": string,
+    "tagline": string,
     "address": string,
+    "branch": string,
+    "city": string,
+    "postal_code": string,
+    "country": string,
     "schedule": string,
+    "phone": [string],
+    "email": [string],
+    "website": [string],
+    "services": [string],
+    "social_links": {
+      "linkedin": string,
+      "github": string,
+      "twitter": string,
+      "facebook": string,
+      "instagram": string,
+      "youtube": string
+    },
     "monogram": string,
     "theme": {
       "bg_card": [r, g, b],
@@ -117,6 +152,9 @@ Return ONLY a JSON object:
 
 def reason_card_modifications(current_state: dict, history_list: list, user_message: str, api_key: str) -> tuple[str, dict]:
     """Uses GPT-4o-mini to calculate state diffs, enforce design stability or rollback, and generate conversational response."""
+    logger.info(f"Reasoning input - current_card_state: {current_state}")
+    logger.info(f"Reasoning input - user_instruction: {user_message}")
+
     payload = json.dumps({
         "model": "gpt-4o-mini",
         "messages": [
@@ -149,6 +187,9 @@ def reason_card_modifications(current_state: dict, history_list: list, user_mess
             parsed = json.loads(content)
             assistant_msg = parsed.get('assistant_message', 'Updated your visiting card design.')
             new_state = parsed.get('card_state', {})
+            logger.info(f"Agent reasoning raw parsed assistant_message: {assistant_msg}")
+            logger.info(f"Agent reasoning raw parsed card_state theme: {new_state.get('theme')}")
+            logger.info(f"Agent reasoning raw parsed layout_style: {new_state.get('layout_style')}")
             return assistant_msg, new_state
     except Exception as e:
         logger.error(f"Agent reasoning failed: {e}")
@@ -194,15 +235,25 @@ DEFAULT_THEMES = {
 }
 
 def detect_style_intent(text: str) -> str | None:
-    t = text.lower()
-    if any(k in t for k in ['corner arc', 'corner_arc', 'corner-arc', 'কর্নার আর্ক', 'কর্নার']):
+    if not text:
+        return None
+    # Strip URLs and emails to avoid matching keywords within them (e.g. user@techvision.com, https://goldencorp.io)
+    cleaned = re.sub(r'[\w.+-]+@[\w-]+\.[\w.-]+', ' ', text)
+    cleaned = re.sub(r'https?://\S+|www\.\S+', ' ', cleaned)
+    t = cleaned.lower()
+
+    if re.search(r'\bcorner[\s_-]?arcs?\b', t):
         return 'corner_arcs'
-    if any(k in t for k in ['organic wave', 'organic_wave', 'organic-wave', 'অর্গানিক ওয়েভ', 'অর্গানিক', 'তরঙ্গ']):
+    if re.search(r'\borganic[\s_-]?waves?\b', t):
         return 'organic_waves'
-    if any(k in t for k in ['cyber', 'tech', 'সাইবার', 'টেক', 'আইটি']):
+    if re.search(r'\b(?:cyber[\s_-]?tech|cyber)\b', t):
         return 'cyber_tech'
-    if any(k in t for k in ['luxury', 'gold', 'লাক্সারি', 'গোল্ড', 'সোনালী']):
+    # Match 'tech' or 'IT' (uppercase) only when referring to tech style or department, not pronoun 'it'
+    if re.search(r'\btech\b', t) or re.search(r'\bIT\b', cleaned):
+        return 'cyber_tech'
+    if re.search(r'\b(?:luxury[\s_-]?gold|luxury|gold)\b', t):
         return 'luxury_gold'
+
     return None
 
 def detect_rollback_intent(text: str) -> bool:
@@ -214,16 +265,67 @@ def detect_rollback_intent(text: str) -> bool:
     ]
     return any(k in t for k in rollback_keywords)
 
+def detect_color_intent(text: str) -> bool:
+    if not text:
+        return False
+    # Strip URLs and emails
+    cleaned = re.sub(r'[\w.+-]+@[\w-]+\.[\w.-]+', ' ', text)
+    cleaned = re.sub(r'https?://\S+|www\.\S+', ' ', cleaned)
+    t = cleaned.lower()
 
-def get_next_fresh_layout_style(last_style: str | None = None) -> str:
+    color_names = (
+        r'(?:red|blue|green|yellow|orange|purple|pink|black|white|'
+        r'dark|light|navy|cyan|gold|teal|maroon|gray|grey|crimson|scarlet|amber)'
+    )
+
+    # 1. Direct color properties: background, bg, theme, palette, accent, color, colour
+    if re.search(r'\b(?:background|bg|theme|palette|accent|color|colour)\b', t):
+        if re.search(rf'\b{color_names}\b', t) or re.search(r'\b(?:change|make|set|switch|update|use|bright|darker|lighter|dark|light)\b', t):
+            return True
+
+    # 2. Action + color target: e.g. "make it red", "turn it blue", "paint it green", "change to red"
+    if re.search(rf'\b(?:make|turn|paint|change|switch)\s+(?:it\s+)?(?:to\s+)?{color_names}\b', t):
+        return True
+
+    # 3. Explicit color phrase: "<color> color", "<color> background", "<color> theme"
+    if re.search(rf'\b{color_names}\s+(?:color|colour|bg|background|theme|palette|accent|shade|tone|tint)\b', t):
+        return True
+
+    return False
+
+def verify_phone_in_image(image_bytes: bytes, expected_phone: str | list) -> bool | None:
+    if not expected_phone:
+        return None
+    if isinstance(expected_phone, (list, tuple)):
+        expected_phones = [str(p) for p in expected_phone if str(p).strip()]
+    else:
+        expected_phones = [str(expected_phone).strip()]
+    if not expected_phones:
+        return None
+    try:
+        import pytesseract
+        from PIL import Image
+        img = Image.open(io.BytesIO(image_bytes))
+        ocr_text = pytesseract.image_to_string(img)
+        clean_ocr = re.sub(r'\D', '', ocr_text)
+        for ep in expected_phones:
+            clean_expected = re.sub(r'\D', '', ep)
+            if clean_expected and clean_expected not in clean_ocr:
+                return False
+        return True
+    except Exception:
+        return None
+
+
+def get_next_fresh_layout_style(seed_text: str | None = None) -> str:
     """
-    Guarantees that every newly initiated card session (without session_id)
-    uses a DIFFERENT design from the previous card, so consecutive cards are never identical.
+    Diverse layout selector fallback when LLM provides no valid style.
+    Uses prompt/text hash to ensure diversity without cross-user database queries.
     """
     available_styles = ['organic_waves', 'cyber_tech', 'luxury_gold', 'corner_arcs']
-    if last_style and last_style in available_styles:
-        next_idx = (available_styles.index(last_style) + 1) % len(available_styles)
-        return available_styles[next_idx]
+    if seed_text:
+        idx = abs(hash(seed_text)) % len(available_styles)
+        return available_styles[idx]
     return 'luxury_gold'
 
 
@@ -235,10 +337,9 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
     from card_project.key_manager import get_active_openai_key
     api_key = get_active_openai_key()
 
-    # 1. Retrieve or Create Session
+    # 1. Retrieve or Create Session (Isolated per session - no cross-user table querying)
     session = None
     is_new_session = False
-    last_system_style = None
 
     if session_id:
         try:
@@ -247,10 +348,6 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
             session = None
 
     if not session:
-        last_sess = CardSession.objects.order_by('-created_at').first()
-        if last_sess and last_sess.current_state:
-            last_system_style = last_sess.current_state.get('layout_style')
-
         session = CardSession.objects.create(current_state={}, version=1)
         version = 1
         is_new_session = True
@@ -259,6 +356,7 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
         is_new_session = False
 
     current_state = session.current_state or {}
+    logger.info(f"Turn start for session {session.id} (v{version}): current_state={current_state}")
 
     # 2. Extract recent conversation history with full state snapshots
     history_messages = list(session.messages.order_by('-created_at')[:8])
@@ -293,13 +391,19 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
         if not updated_state.get('name'):
             updated_state['name'] = user_message[:40]
 
-    # Ensure clean string values
-    for k in ['name', 'designation', 'company_name', 'address', 'schedule', 'phone', 'email', 'website', 'monogram']:
-        updated_state[k] = str(updated_state.get(k) or '').strip()
+    # Normalize comprehensive visiting card data structure
+    updated_state = normalize_card_data(updated_state)
 
     # 4. Deterministic State Preservation, Explicit Redesign, and Rollback
     explicit_style = detect_style_intent(user_message)
     is_rollback = detect_rollback_intent(user_message)
+    is_color_intent = detect_color_intent(user_message)
+
+    logger.info(
+        f"Session {session.id} v{version} intent analysis: "
+        f"is_new_session={is_new_session}, explicit_style={explicit_style}, "
+        f"is_color_intent={is_color_intent}, is_rollback={is_rollback}"
+    )
 
     if is_rollback and not is_new_session:
         # Rollback intent detected in ongoing session
@@ -323,20 +427,42 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
     elif explicit_style:
         # Explicit style change requested by user
         updated_state['layout_style'] = explicit_style
-        if not updated_state.get('theme') or updated_state.get('theme') == current_state.get('theme'):
+        if is_color_intent and updated_state.get('theme'):
+            pass
+        elif not updated_state.get('theme') or updated_state.get('theme') == current_state.get('theme'):
             updated_state['theme'] = DEFAULT_THEMES.get(explicit_style, DEFAULT_THEMES['corner_arcs'])
     elif is_new_session:
         # BRAND NEW CARD (No session_id passed):
-        # Guarantee a DIFFERENT design from the last card!
-        chosen_style = get_next_fresh_layout_style(last_style=last_system_style)
-        updated_state['layout_style'] = chosen_style
-        updated_state['theme'] = DEFAULT_THEMES.get(chosen_style, DEFAULT_THEMES['luxury_gold'])
+        # 1. Prioritize GPT's intelligent layout selection based on prompt/profession
+        gpt_style = updated_state.get('layout_style')
+        if gpt_style and gpt_style in DEFAULT_THEMES:
+            chosen_style = gpt_style
+            # Ensure theme aligns with the chosen style if not already provided or if empty
+            if not isinstance(updated_state.get('theme'), dict) or not updated_state.get('theme').get('bg_card'):
+                updated_state['theme'] = DEFAULT_THEMES.get(chosen_style, DEFAULT_THEMES['organic_waves'])
+        else:
+            # Fallback only when GPT provided no style or an invalid value
+            chosen_style = get_next_fresh_layout_style(seed_text=user_message)
+            updated_state['layout_style'] = chosen_style
+            updated_state['theme'] = DEFAULT_THEMES.get(chosen_style, DEFAULT_THEMES['luxury_gold'])
     else:
         # ONGOING SESSION (session_id passed):
-        # Strictly preserve the user's established design on text/phone/name edits
+        # 1. Deterministic layout preservation:
+        # Layout style MUST strictly come from session.current_state unless explicit_style was requested
         if current_state.get('layout_style'):
+            logger.info(f"Session {session.id} v{version}: Deterministic override: strictly preserving layout_style '{current_state['layout_style']}'")
             updated_state['layout_style'] = current_state['layout_style']
-        if current_state.get('theme'):
+        elif not updated_state.get('layout_style'):
+            updated_state['layout_style'] = 'corner_arcs'
+
+        # 2. Deterministic theme preservation:
+        # If user explicitly requested color/theme change AND GPT produced an updated theme, adopt it.
+        # OTHERWISE (including text-only edits, adding company name, changing contact info),
+        # STRICTLY preserve current_state['theme'] from previous turn.
+        if is_color_intent and updated_state.get('theme') and updated_state.get('theme') != current_state.get('theme'):
+            logger.info(f"Session {session.id} v{version}: Honoring color change intent: {updated_state.get('theme')}")
+        elif current_state.get('theme'):
+            logger.info(f"Session {session.id} v{version}: Deterministic override: strictly preserving previous theme {current_state.get('theme')}")
             updated_state['theme'] = current_state['theme']
         elif not updated_state.get('theme'):
             updated_state['theme'] = DEFAULT_THEMES.get(updated_state['layout_style'], DEFAULT_THEMES['organic_waves'])
@@ -349,35 +475,21 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
         else:
             updated_state['monogram'] = updated_state['name'][:2].upper()
 
-    # 5. Generate High-Definition Visiting Card Image
-    user_wants_dalle = any(w in user_message.lower() for w in ['dall-e', 'dalle', 'diffusion image', 'ai illustration'])
+    # 5. Generate AI Visiting Card Image (Always AI image model - no vector fallback)
+    if not api_key:
+        raise ValueError("OpenAI API key not configured — card generation requires an active key.")
 
-    image_bytes = None
-    if user_wants_dalle and api_key:
-        logger.info("User explicitly requested DALL-E generation...")
-        dalle_prompt = build_precision_dalle_prompt(updated_state)
-        raw_bytes = generate_dalle_card(dalle_prompt, api_key)
-        if raw_bytes:
-            image_bytes = auto_crop_card_surface(raw_bytes)
+    dalle_prompt = build_precision_dalle_prompt(updated_state)
+    raw_bytes = generate_dalle_card(dalle_prompt, api_key)
+    if not raw_bytes:
+        logger.error(f"AI card image generation failed for session {session.id}")
+        raise RuntimeError("AI card generation failed: OpenAI image generation returned no image.")
 
-    # Primary High-Definition Precision Vector Engine
-    if not image_bytes:
-        image_bytes = generate_business_card(updated_state)
+    image_bytes = auto_crop_card_surface(raw_bytes)
 
-    # 5. Save Image to Media Directory
-    media_cards_dir = Path(settings.MEDIA_ROOT) / 'cards'
-    media_cards_dir.mkdir(parents=True, exist_ok=True)
-
-    filename = f"card_{session.id}_v{version}.png"
-    filepath = media_cards_dir / filename
-    with open(filepath, 'wb') as f:
-        f.write(image_bytes)
-
-    relative_url = f"{settings.MEDIA_URL}cards/{filename}"
-    if request:
-        image_url = request.build_absolute_uri(relative_url)
-    else:
-        image_url = relative_url
+    # 5. Convert Image to Base64 (In-memory, no disk file saving)
+    b64_str = base64.b64encode(image_bytes).decode('utf-8')
+    image_base64 = f"data:image/png;base64,{b64_str}"
 
     # 6. Update Session & Record Assistant Message
     session.current_state = updated_state
@@ -389,14 +501,26 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
         role='assistant',
         content=assistant_message,
         card_data=updated_state,
-        image_url=relative_url,
+        image_url=image_base64,
+        image_base64=image_base64,
         version=version
     )
 
-    return {
+    ret = {
         "status": "success",
         "session_id": str(session.id),
         "version": version,
         "assistant_message": assistant_message,
-        "image_url": image_url,
+        "card_data": updated_state,
+        "image_base64": image_base64,
+        "image_url": image_base64,
+        "user_prompt": user_message,
+        "note": "AI-generated cards should be manually verified for text accuracy before printing or sharing.",
     }
+
+    # Optional OCR validation
+    phone_check = verify_phone_in_image(image_bytes, updated_state.get('phone', ''))
+    if phone_check is False:
+        ret["warning"] = "Please verify the phone number on the generated card matches your input exactly, as AI-generated text can occasionally contain errors."
+
+    return ret

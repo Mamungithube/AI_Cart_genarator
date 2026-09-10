@@ -57,7 +57,8 @@ class CardMessage(models.Model):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES)
     content = models.TextField()
     card_data = models.JSONField(default=dict, blank=True, null=True)
-    image_url = models.CharField(max_length=500, blank=True, default='')
+    image_url = models.TextField(blank=True, default='')
+    image_base64 = models.TextField(blank=True, default='')
     version = models.IntegerField(default=1)
     created_at = models.DateTimeField(auto_now_add=True)
 

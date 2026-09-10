@@ -1,4 +1,7 @@
 import io
+import json
+import logging
+import urllib.parse
 from django.http import HttpResponse, JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -9,6 +12,8 @@ from .serializers import CardPromptSerializer, CardChatSerializer
 from .models import GeneratedCard, CardSession, CardMessage
 from .services.ai_card_drawer import generate_hybrid_business_card
 from .services.card_agent import process_card_agent_turn
+
+logger = logging.getLogger(__name__)
 
 
 class CardChatAPIView(APIView):
@@ -29,7 +34,9 @@ class CardChatAPIView(APIView):
         "session_id": "...",
         "version": 1,
         "assistant_message": "I've created your visiting card...",
-        "image_url": "/media/cards/card_..._v1.png",
+        "card_data": { ... },
+        "image_base64": "data:image/png;base64,...",
+        "image_url": "data:image/png;base64,...",
       }
     """
     permission_classes = [HasAPIKey]
@@ -39,8 +46,15 @@ class CardChatAPIView(APIView):
         if serializer.is_valid():
             session_id = serializer.validated_data.get('session_id')
             message = serializer.validated_data['message']
-            result = process_card_agent_turn(session_id=session_id, user_message=message, request=request)
-            return Response(result, status=status.HTTP_200_OK)
+            try:
+                result = process_card_agent_turn(session_id=session_id, user_message=message, request=request)
+                return Response(result, status=status.HTTP_200_OK)
+            except ValueError as e:
+                logger.warning(f"Card chat configuration error: {e}")
+                return Response({"status": "error", "error": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+            except Exception as e:
+                logger.error(f"Card chat processing failed: {e}")
+                return Response({"status": "error", "error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -63,7 +77,8 @@ class CardSessionHistoryAPIView(APIView):
                 "role": m.role,
                 "content": m.content,
                 "card_data": m.card_data,
-                "image_url": m.image_url,
+                "image_base64": m.image_base64 or m.image_url,
+                "image_url": m.image_base64 or m.image_url,
                 "version": m.version,
                 "created_at": m.created_at.isoformat()
             })
@@ -72,6 +87,7 @@ class CardSessionHistoryAPIView(APIView):
             "session_id": str(session.id),
             "current_version": session.version,
             "current_state": session.current_state,
+            "card_data": session.current_state,
             "created_at": session.created_at.isoformat(),
             "updated_at": session.updated_at.isoformat(),
             "messages": messages_data
@@ -93,18 +109,32 @@ class GenerateCardAPIView(APIView):
 
     def _generate_and_respond(self, prompt: str):
         """Shared logic for GET and POST."""
-        # 3-step pipeline: parse → background → text overlay
-        image_bytes, card_data = generate_hybrid_business_card(prompt)
+        try:
+            # 3-step pipeline: parse → background → text overlay
+            image_bytes, card_data = generate_hybrid_business_card(prompt)
+        except ValueError as e:
+            logger.warning(f"Card generation configuration error: {e}")
+            return Response({"status": "error", "error": str(e)}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        except Exception as e:
+            logger.error(f"Card generation failed: {e}")
+            return Response({"status": "error", "error": str(e)}, status=status.HTTP_502_BAD_GATEWAY)
 
         # Save to PostgreSQL
+        phones = card_data.get('phone') or card_data.get('phones') or []
+        emails = card_data.get('email') or card_data.get('emails') or []
+        websites = card_data.get('websites') or card_data.get('website') or []
+        phone_str = ", ".join(phones) if isinstance(phones, (list, tuple)) else str(phones)
+        email_str = ", ".join(emails) if isinstance(emails, (list, tuple)) else str(emails)
+        website_str = ", ".join(websites) if isinstance(websites, (list, tuple)) else str(websites)
+
         GeneratedCard.objects.create(
             prompt=prompt,
-            name=card_data.get('name', ''),
-            designation=card_data.get('designation', ''),
-            phone=card_data.get('phone', ''),
-            email=card_data.get('email', ''),
-            website=card_data.get('website', ''),
-            company_name=card_data.get('company_name', ''),
+            name=str(card_data.get('name', '') or ''),
+            designation=str(card_data.get('designation', '') or ''),
+            phone=phone_str,
+            email=email_str,
+            website=website_str,
+            company_name=str(card_data.get('company_name', '') or ''),
         )
 
         # Return PNG
@@ -112,6 +142,9 @@ class GenerateCardAPIView(APIView):
         response = HttpResponse(image_bytes, content_type='image/png')
         response['Content-Disposition'] = f'inline; filename="visiting_card_{safe_name}.png"'
         response['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response['X-User-Prompt'] = urllib.parse.quote(prompt)
+        response['X-Card-Data'] = urllib.parse.quote(json.dumps(card_data))
+        response['X-AI-Note'] = "AI-generated cards should be manually verified for text accuracy before printing or sharing."
         return response
 
     def post(self, request, *args, **kwargs):
