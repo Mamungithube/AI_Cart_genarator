@@ -348,7 +348,6 @@ def generate_dalle_card(dalle_prompt: str, api_key: str) -> bytes | None:
     logger.info(f"Generating DALL-E image with final prompt:\n{dalle_prompt}")
 
     model_configs = [
-        ('gpt-image-1', '1536x1024'),
         ('dall-e-3', '1792x1024'),
         ('dall-e-2', '1024x1024'),
     ]
@@ -359,7 +358,8 @@ def generate_dalle_card(dalle_prompt: str, api_key: str) -> bytes | None:
                 'model': model,
                 'prompt': dalle_prompt,
                 'n': 1,
-                'size': size
+                'size': size,
+                'response_format': 'b64_json'
             }).encode()
 
             req = urllib.request.Request(
@@ -371,7 +371,7 @@ def generate_dalle_card(dalle_prompt: str, api_key: str) -> bytes | None:
                 }
             )
 
-            with urllib.request.urlopen(req, timeout=120) as res:
+            with urllib.request.urlopen(req, timeout=90) as res:
                 result = json.loads(res.read())
                 item = result.get('data', [{}])[0]
                 if 'b64_json' in item:
@@ -460,7 +460,7 @@ def auto_crop_card_surface(image_bytes: bytes) -> bytes:
                 logger.info(f"Auto-crop removing outer borders: left={c_left}, top={c_top}, right={c_right}, bottom={c_bottom}")
                 cropped = img.crop((c_left, c_top, c_right, c_bottom))
                 buf = io.BytesIO()
-                cropped.save(buf, format="PNG", optimize=True)
+                cropped.save(buf, format="PNG")
                 return buf.getvalue()
 
         return image_bytes

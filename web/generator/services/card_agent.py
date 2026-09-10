@@ -2,6 +2,7 @@ import os
 import io
 import re
 import json
+import time
 import base64
 import logging
 import urllib.request
@@ -479,13 +480,18 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
     if not api_key:
         raise ValueError("OpenAI API key not configured — card generation requires an active key.")
 
+    t_img_start = time.time()
     dalle_prompt = build_precision_dalle_prompt(updated_state)
     raw_bytes = generate_dalle_card(dalle_prompt, api_key)
+    logger.info(f"Image generation took: {time.time() - t_img_start:.2f}s")
+
     if not raw_bytes:
         logger.error(f"AI card image generation failed for session {session.id}")
         raise RuntimeError("AI card generation failed: OpenAI image generation returned no image.")
 
+    t_crop_start = time.time()
     image_bytes = auto_crop_card_surface(raw_bytes)
+    logger.info(f"Auto-crop took: {time.time() - t_crop_start:.2f}s")
 
     # 5. Convert Image to Base64 (In-memory, no disk file saving)
     b64_str = base64.b64encode(image_bytes).decode('utf-8')
