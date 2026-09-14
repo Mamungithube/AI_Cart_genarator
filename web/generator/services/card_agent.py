@@ -55,11 +55,12 @@ YOUR TASK & CORE RULES:
      ["left_monogram_stack", "centered_hero", "split_diagonal", "right_aligned_monogram", "top_banner", "asymmetric_offset"]
      so consecutive cards are diverse not only in color and pattern, but fundamentally distinct in structural composition!
 
-1. CRITICAL RULE: DESIGN STABILITY ON TEXT EDITS (DO NOT CHANGE DESIGN RANDOMLY!):
-   - When a user updates or adds text fields (e.g. "change name to Dodul ch.", "add phone 012555555555", "change designation", "add email", "add my company name ..."):
+1. CRITICAL RULE: DESIGN STABILITY ON TEXT EDITS & "DONT CHANGE DESIGN" REQUESTS:
+   - When a user says "dont change my design", "keep this design", "same design", "without changing design", "ডিজাইন পরিবর্তন করো না", or simply updates/adds text fields (e.g. "change name to Dodul ch.", "add phone 012555555555", "change designation", "add email", "add my company name ..."):
      * YOU MUST PRESERVE the existing "layout_style", "theme", AND "composition_variant" EXACTLY as they are in "current_card_state"!
-     * NEVER change the visual layout style, colors, or structural composition when only text/contact info/company name is being updated or added!
+     * NEVER change the visual layout style, colors, or structural composition when the user asks not to change the design or when only text/contact info is updated!
      * Compute "monogram" automatically from the initials of the new name if the name changed (e.g. "Dodul ch." -> "DO").
+     * In "assistant_message", confirm in English that you kept their exact design unchanged as requested.
 
 2. CRITICAL RULE: ROLLBACK & RESTORING PREVIOUS DESIGNS:
    - If the user asks to revert or bring back an earlier design (e.g. "bring back the previous design", "revert to previous design", "restore earlier version", "why did you change the design", "undo design change"):
@@ -430,9 +431,65 @@ def detect_color_intent(text: str) -> bool:
 
     return False
 
+def detect_preserve_design_intent(text: str) -> bool:
+    """
+    Detects when the user explicitly requests to KEEP / PRESERVE their existing design:
+    e.g. "dont change my design", "keep this design", "same design", "ডিজাইন পরিবর্তন করো না".
+    """
+    if not text:
+        return False
+    cleaned = re.sub(r'[\w.+-]+@[\w-]+\.[\w.-]+', ' ', text)
+    cleaned = re.sub(r'https?://\S+|www\.\S+', ' ', cleaned)
+    t = cleaned.lower()
+
+    # English patterns
+    preserve_patterns = [
+        r'\b(?:don\'?t|do\s+not|never|no|stop|without)\s+(?:change|alter|modify|switch|redesign|touch)\s+(?:the\s+|my\s+|this\s+|current\s+)?(?:design|template|layout|style|look|colors?)\b',
+        r'\b(?:keep|preserve|stay\s+with|maintain|leave)\s+(?:the\s+|my\s+|this\s+|current\s+)?(?:same\s+)?(?:design|template|layout|style|look|colors?)\b',
+        r'\b(?:same\s+design|same\s+template|same\s+layout|same\s+style)\b(?!\s+(?:again|always|every\s+time|over\s+and\s+over))\b',
+        r'\buse\s+(?:the\s+)?same\s+(?:design|template|layout|style)\b',
+        r'\bwithout\s+changing\s+(?:the\s+|my\s+)?(?:design|template|layout|style)\b',
+        r'\bno\s+design\s+change\b',
+        r'\bleave\s+(?:the\s+)?(?:design|layout|style)\s+as\s+is\b',
+        r'\bdesign\s+(?:should\s+be\s+)?(?:the\s+)?same\b',
+    ]
+    for pat in preserve_patterns:
+        if re.search(pat, t):
+            return True
+
+    # Bengali & Banglish phrases
+    bengali_preserve_phrases = [
+        'ডিজাইন পরিবর্তন করো না', 'ডিজাইন পরিবর্তন করবেন না', 'ডিজাইন পরিবর্তন করবে না', 'ডিজাইন পরিবর্তন করবা না',
+        'ডিজাইন চ্যাঞ্জ করো না', 'ডিজাইন চ্যাঞ্জ করবেন না', 'ডিজাইন চ্যাঞ্জ করবা না',
+        'ডিজাইন চেঞ্জ করো না', 'ডিজাইন চেঞ্জ করবেন না', 'ডিজাইন চেঞ্জ করবা না',
+        'ডিজাইন বদলাবে না', 'ডিজাইন বদলাও না', 'ডিজাইন বদলাইও না',
+        'ডিজাইন সেইম রাখো', 'ডিজাইন সেইম থাকবে', 'ডিজাইন সেইম রাখ', 'ডিজাইন একই রাখো', 'ডিজাইন একি রাখো',
+        'ডিজাইন পরিবর্তন না করে', 'ডিজাইন চেঞ্জ না করে', 'ডিজাইন চ্যাঞ্জ না করে',
+        'টেমপ্লেট পরিবর্তন করো না', 'টেমপ্লেট চেঞ্জ করো না', 'টেমপ্লেট সেইম রাখো',
+        'স্টাইল পরিবর্তন করো না', 'স্টাইল চেঞ্জ করো না', 'স্টাইল সেইম রাখো',
+        'design change koro na', 'design change korba na', 'design change korben na',
+        'design change krio na', 'design same rakho', 'design bodlaio na', 'design change koro nah',
+        'dont change design', 'dont change my design', 'do not change design'
+    ]
+    if any(p in t for p in bengali_preserve_phrases):
+        return True
+
+    # Regex for Bengali negation near design
+    if re.search(r'ডিজাইন[^\n.!?]{0,30}\b(?:না|করো না|করবা না|করবেন না|করিস না|রাখো|থাকবে)\b', t):
+        if not re.search(r'ডিজাইন\s+(?:ভালো|সুন্দর|পছন্দ|বাজে)\s+না', t):
+            return True
+
+    return False
+
+
 def detect_redesign_intent(text: str) -> bool:
     if not text:
         return False
+
+    # CRITICAL: If the user asked to KEEP/PRESERVE design, NEVER treat as redesign!
+    if detect_preserve_design_intent(text):
+        return False
+
     # Strip URLs and emails
     cleaned = re.sub(r'[\w.+-]+@[\w-]+\.[\w.-]+', ' ', text)
     cleaned = re.sub(r'https?://\S+|www\.\S+', ' ', cleaned)
@@ -455,17 +512,16 @@ def detect_redesign_intent(text: str) -> bool:
     if any(k in t for k in bengali_redesign_keywords):
         return True
 
-    # 1. Explicit redesign phrases
+    # 1. Explicit redesign phrases (with negative lookbehind so "don't change design" won't match)
     redesign_patterns = [
         r'\bredesign\b',
         r'\bdifferent\s+(?:design|template|layout|style|look)\b',
         r'\b(?:new|fresh)\s+(?:look|design|template|layout|style)\b',
-        r'\bchange\s+(?:the\s+)?(?:design|template|layout|style)(?:\s+completely)?\b',
+        r'(?<!\bdon\'t\s)(?<!\bdont\s)(?<!\bdo\s+not\s)(?<!\bnever\s)(?<!\bwithout\s)\bchange\s+(?:the\s+|my\s+|this\s+)?(?:design|template|layout|style)(?:\s+completely)?\b',
         r'\bswitch\s+(?:the\s+)?(?:design|template|layout|style)\b',
-        r'\bchange\s+(?:it\s+)?(?:completely|totally|entirely)\b',
+        r'(?<!\bdon\'t\s)(?<!\bdont\s)(?<!\bdo\s+not\s)\bchange\s+(?:it\s+)?(?:completely|totally|entirely)\b',
         r'\bmake\s+it\s+look\s+different\b',
-        r'\bsame\s+(?:design|template|layout)\b',
-        r'\bnot\s+changing\s+(?:the\s+)?(?:design|template|layout)\b',
+        r'\bsame\s+(?:design|template|layout)\s+(?:again|always|every\s+time|over\s+and\s+over)\b',
     ]
     for pat in redesign_patterns:
         if re.search(pat, t):
@@ -598,18 +654,32 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
     # 4. Deterministic State Preservation, Explicit Redesign, and Rollback
     explicit_style = detect_style_intent(user_message)
     explicit_composition = detect_composition_intent(user_message)
-    is_redesign = detect_redesign_intent(user_message)
-    is_rollback = detect_rollback_intent(user_message)
-    is_color_intent = detect_color_intent(user_message)
+    is_preserve_design = detect_preserve_design_intent(user_message)
+    is_redesign = detect_redesign_intent(user_message) and not is_preserve_design
+    is_rollback = detect_rollback_intent(user_message) and not is_preserve_design
+    is_color_intent = detect_color_intent(user_message) and not is_preserve_design
 
     logger.info(
         f"Session {session.id} v{version} intent analysis: "
-        f"is_new_session={is_new_session}, explicit_style={explicit_style}, "
-        f"explicit_composition={explicit_composition}, "
+        f"is_new_session={is_new_session}, is_preserve_design={is_preserve_design}, "
+        f"explicit_style={explicit_style}, explicit_composition={explicit_composition}, "
         f"is_redesign={is_redesign}, is_color_intent={is_color_intent}, is_rollback={is_rollback}"
     )
 
-    if is_rollback and not is_new_session:
+    if is_preserve_design and not is_new_session:
+        # EXPLICIT PRESERVE: User specifically commanded "dont change my design", "keep this design", etc.
+        logger.info(
+            f"Session {session.id} v{version}: Explicit PRESERVE DESIGN intent detected. "
+            f"Strictly locking layout_style '{current_state.get('layout_style')}', "
+            f"composition '{current_state.get('composition_variant')}', and theme."
+        )
+        if current_state.get('layout_style'):
+            updated_state['layout_style'] = current_state['layout_style']
+        if current_state.get('composition_variant'):
+            updated_state['composition_variant'] = current_state['composition_variant']
+        if current_state.get('theme'):
+            updated_state['theme'] = current_state['theme']
+    elif is_rollback and not is_new_session:
         # Rollback intent detected in ongoing session
         if explicit_style:
             updated_state['layout_style'] = explicit_style
