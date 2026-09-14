@@ -265,6 +265,38 @@ LAYOUT_STYLE_DESCRIPTIONS = {
         "delicate circular crest emblem, high-fashion serif typography, "
         "matte obsidian black background with champagne gold accents"
     ),
+    'corporate_clean': (
+        "Executive structured sapphire navy header, crisp Swiss typography, "
+        "modern business divider line, professional institutional aesthetic"
+    ),
+    'minimalist_modern': (
+        "High-contrast monochromatic or slate background, ample whitespace, "
+        "hairline perimeter frame, corner crosshairs, razor-sharp typography"
+    ),
+    'medical_clinical': (
+        "Deep clinical navy and soft teal glow, healthcare shield badge, "
+        "pristine appointment schedule, clean qualifications display"
+    ),
+    'creative_studio': (
+        "Bold asymmetric modern color panels, avant-garde studio layout, "
+        "high-contrast diamond crest, stylish typography"
+    ),
+    'nature_botanical': (
+        "Deep emerald forest green with warm sage and champagne accents, "
+        "delicate double hairline border, botanical corner accents"
+    ),
+    'bold_editorial': (
+        "Heavy high-impact typography, Swiss editorial gridline accents, "
+        "bold top header bar, magazine masthead aesthetic"
+    ),
+    'artisan_craft': (
+        "Rich dark chocolate espresso with warm copper/bronze accents, "
+        "classic double perimeter, heritage multi-ring circular seal"
+    ),
+    'neon_duotone': (
+        "Midnight obsidian violet with dual electric cyan and magenta accents, "
+        "futuristic glowing borders, high-tech registration ticks"
+    ),
 }
 
 

@@ -355,22 +355,58 @@ def generate_card_code(card_data: dict, user_prompt: str, api_key: str) -> str:
             "- Draw 2-3 overlapping sweeping curved arcs or wave shapes across one corner or along the bottom/side.\n"
             "- Badge shape: 'circle' or 'diamond' with fluid styling."
         ),
-        'minimal_clean': (
+        'corner_arcs': (
+            "STYLE: Corner Arcs / Architectural Modern\n"
+            "- Background: Dark slate or charcoal.\n"
+            "- Draw concentric architectural rounded arcs hugging corners with diagonal accent tick lines.\n"
+            "- Badge shape: 'circle' with inner accent ring."
+        ),
+        'minimalist_modern': (
             "STYLE: Minimal Clean / Scandinavian Modern\n"
-            "- Background: Crisp high-contrast layout.\n"
-            "- Razor-sharp typography, ample negative space, single bold accent divider line.\n"
+            "- Background: Crisp high-contrast dark or deep charcoal layout.\n"
+            "- Razor-sharp typography, ample negative space, single bold accent divider line, corner crosshairs.\n"
             "- Badge shape: 'square' with rounded corners."
         ),
-        'corporate_blue': (
-            "STYLE: Corporate Blue / Institutional\n"
+        'corporate_clean': (
+            "STYLE: Corporate Clean / Executive Sapphire\n"
             "- Deep navy and royal sapphire color palette with crisp white typography.\n"
-            "- Structured geometric header/footer or vertical sidebar band.\n"
+            "- Structured geometric header/footer or vertical sidebar band with elegant accent line.\n"
             "- Badge shape: 'circle' or 'square'."
+        ),
+        'medical_clinical': (
+            "STYLE: Medical Clinical / Healthcare Precision\n"
+            "- Deep medical navy or clean teal/cyan glow.\n"
+            "- Subtle healthcare plus badge or pulse wave motif, pristine chamber hours and qualifications display.\n"
+            "- Badge shape: 'circle' with medical shield styling."
+        ),
+        'creative_studio': (
+            "STYLE: Creative Studio / Avant-Garde\n"
+            "- Vibrant modern studio palette with bold asymmetric geometric color blocks.\n"
+            "- High-contrast diagonal cuts or framing with stylish typography.\n"
+            "- Badge shape: 'diamond' or 'hexagon'."
+        ),
+        'nature_botanical': (
+            "STYLE: Nature Botanical / Organic Wellness\n"
+            "- Deep emerald forest green with warm sage and champagne accents.\n"
+            "- Delicate double hairline border with botanical corner pips.\n"
+            "- Badge shape: 'circle' with botanical leaf tick."
         ),
         'bold_editorial': (
             "STYLE: Bold Editorial / High-Impact\n"
-            "- High-contrast typographic blocks, bold saturated color fields, heavy headlines.\n"
+            "- High-contrast typographic blocks, bold saturated color fields, heavy headlines, Swiss grid.\n"
             "- Badge shape: 'square' or 'diamond'."
+        ),
+        'artisan_craft': (
+            "STYLE: Artisan Craft / Heritage Workshop\n"
+            "- Rich dark chocolate espresso with warm bronze/copper accents.\n"
+            "- Classic double hairline perimeter and heritage circular seal.\n"
+            "- Badge shape: 'circle' with multi-ring seal."
+        ),
+        'neon_duotone': (
+            "STYLE: Neon Duotone / Cyberpunk Sleek\n"
+            "- Midnight violet background with dual electric cyan and magenta accents.\n"
+            "- High-tech registration ticks, glowing dividers, futuristic badge.\n"
+            "- Badge shape: 'hexagon' or 'diamond'."
         ),
     }
 

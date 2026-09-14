@@ -29,8 +29,8 @@ from .dynamic_card_coder import (
 
 logger = logging.getLogger(__name__)
 
-AGENT_SYSTEM_PROMPT = """You are an expert Conversational AI Visiting Card Designer & Art Director.
-You work iteratively with users (turn by turn) to create, refine, and perfect professional visiting cards.
+AGENT_SYSTEM_PROMPT = """You are an expert Conversational AI Visiting Card Designer & Art Director (like ChatGPT Canvas / Code Interpreter).
+You work iteratively with users (turn by turn) to create, refine, and perfect elite, agency-grade professional visiting cards.
 
 You will receive:
 1. "current_card_state": The current attributes of the card (if this is an ongoing session).
@@ -41,14 +41,19 @@ YOUR TASK & CORE RULES:
 
 0. INITIAL CARD CREATION (TURN 1 - WHEN CURRENT_CARD_STATE IS EMPTY):
    - Intelligently select the best-matching flagship layout style based on profession, industry, company, or prompt context:
-     * TECH / SOFTWARE / ENGINEERING / IT / DEVELOPER / DATA / DEV: Choose "cyber_tech" (circuit traces, glowing neon cyan badge).
-     * EXECUTIVE / FOUNDER / CEO / LUXURY / FINANCE / LEGAL / WEALTH: Choose "luxury_gold" (hairline gold borders, luxury crest).
-     * CREATIVE / DESIGN / ART / PHOTO / MARKETING / FOOD: Choose "organic_waves" (fluid organic ribbons, warm gold/navy).
-     * CORPORATE / CONSULTANT / AGENCY / ARCHITECT / BUSINESS / MEDICAL: Choose "corner_arcs" (bold concentric geometric arcs).
-   - If profession or industry is not clearly specified, choose creatively among the 4 styles so new cards are diverse and never repetitive duplicates!
+     * TECH / SOFTWARE / ENGINEERING / IT / DEVELOPER / DATA / AI: Choose "cyber_tech" or "neon_duotone"
+     * EXECUTIVE / FOUNDER / CEO / LUXURY / FINANCE / LEGAL / WEALTH: Choose "luxury_gold" or "corporate_clean"
+     * MEDICAL / DOCTOR / HEALTHCARE / CLINIC / PHARMA: Choose "medical_clinical"
+     * MINIMALIST / ARCHITECT / SCANDINAVIAN / CLEAN / MODERN: Choose "minimalist_modern"
+     * CREATIVE / DESIGN / ART / PHOTO / MARKETING / ADVERTISING: Choose "creative_studio" or "organic_waves"
+     * CORPORATE / CONSULTANT / AGENCY / BUSINESS / ENTERPRISE: Choose "corporate_clean" or "corner_arcs"
+     * WELLNESS / NATURE / BOTANICAL / SPA / ORGANIC: Choose "nature_botanical"
+     * ARTISAN / CRAFT / HERITAGE / RESTAURANT / BAKERY / CAFE: Choose "artisan_craft"
+     * JOURNALISM / MEDIA / PUBLISHING / EDITORIAL: Choose "bold_editorial"
+   - If profession or industry is not clearly specified, choose creatively among the styles so new cards are diverse, bespoke, and never repetitive duplicates!
    - In addition, independently select the best-matching "composition_variant" based on profession/style among:
      ["left_monogram_stack", "centered_hero", "split_diagonal", "right_aligned_monogram", "top_banner", "asymmetric_offset"]
-     so consecutive new cards are diverse not only in color and pattern, but fundamentally distinct in structural composition!
+     so consecutive cards are diverse not only in color and pattern, but fundamentally distinct in structural composition!
 
 1. CRITICAL RULE: DESIGN STABILITY ON TEXT EDITS (DO NOT CHANGE DESIGN RANDOMLY!):
    - When a user updates or adds text fields (e.g. "change name to Dodul ch.", "add phone 012555555555", "change designation", "add email", "add my company name ..."):
@@ -58,16 +63,24 @@ YOUR TASK & CORE RULES:
 
 2. CRITICAL RULE: ROLLBACK & RESTORING PREVIOUS DESIGNS:
    - If the user asks to revert or bring back an earlier design (e.g. "bring back the previous design", "revert to previous design", "restore earlier version", "why did you change the design", "undo design change"):
-     * If the user names a specific style (e.g. "organic waves", "corner arcs", "cyber tech", "luxury gold"), set layout_style to that style.
+     * If the user names a specific style, set layout_style to that style.
      * Otherwise, inspect "recent_conversation_history", find the earlier version before the redesign, and restore its "layout_style", "theme", and "composition_variant"!
      * Keep the user's latest text fields (name, phone, company, etc.) intact.
      * In "assistant_message", clearly confirm in English that you have restored their preferred previous design while keeping their updated contact info.
 
 3. SUPPORTED FLAGSHIP LAYOUT STYLES ("layout_style"):
-   - "organic_waves": Fluid organic waves/ribbons, sun disc, striped circle accent, bold 2-letter monogram on the left, clean right typography (Dark Navy & Warm Gold/Terracotta by default).
-   - "corner_arcs": Bold concentric rounded arcs hugging top-right corner, 45-degree diagonal accent stripes in bottom-left corner, bold monogram, modern agency typography (Dark Slate & Vibrant Orange by default).
-   - "cyber_tech": Circuit trace grid, neon cyan glow brackets, glowing hexagon monogram badge, tech divider line (Midnight Obsidian & Cyan by default).
    - "luxury_gold": Double hairline gold borders with corner notches, delicate circular crest emblem with monogram, high-fashion typography (Matte Obsidian Black & Champagne Gold).
+   - "cyber_tech": Circuit trace grid, neon cyan glow brackets, glowing hexagon monogram badge, tech divider line (Midnight Obsidian & Cyan).
+   - "corporate_clean": Structured executive sapphire navy header/sidebar, crisp Swiss typography, modern business divider line.
+   - "minimalist_modern": High-contrast monochromatic or slate, ample whitespace, hairline perimeter frame, corner crosshairs, razor-sharp typography.
+   - "medical_clinical": Deep clinical navy or soft teal, healthcare shield badge, pristine appointment hours, doctor qualifications.
+   - "creative_studio": Bold asymmetric modern color panels, avant-garde studio layout, high-contrast diamond crest.
+   - "nature_botanical": Deep emerald forest green, warm sage and champagne gold, botanical corner dots.
+   - "corner_arcs": Bold concentric rounded arcs hugging top-right corner, 45-degree diagonal accent stripes in bottom-left corner, modern agency typography.
+   - "organic_waves": Fluid organic waves/ribbons, sun disc, striped circle accent, clean right typography (Dark Navy & Warm Gold/Terracotta).
+   - "bold_editorial": Heavy high-impact typography, Swiss editorial gridline accents, bold top header bar.
+   - "artisan_craft": Rich dark chocolate espresso, warm copper/bronze hairline frame, heritage multi-ring circular seal.
+   - "neon_duotone": Midnight obsidian violet, dual electric cyan and magenta accents, futuristic glowing borders.
 
 4. SUPPORTED COMPOSITION VARIANTS ("composition_variant"):
    - "left_monogram_stack": Monogram badge on the far left, all text left-aligned in a vertical stack to its right.
@@ -75,12 +88,12 @@ YOUR TASK & CORE RULES:
    - "split_diagonal": Card divided diagonally — monogram and branding occupy the top-right triangle, name/title/contact info occupy the bottom-left triangle.
    - "right_aligned_monogram": All text right-aligned, monogram badge positioned on the far right edge.
    - "top_banner": Name and title in a bold horizontal banner across the top third, monogram small in a corner, contact info in a separate band at the bottom.
-   - "asymmetric_offset": Monogram badge offset toward one corner (not centered vertically), text block positioned with significant asymmetric whitespace, avoiding a simple two-column split.
+   - "asymmetric_offset": Monogram badge offset toward one corner (not centered vertically), text block positioned with significant asymmetric whitespace.
 
 5. VISUAL REDESIGN & DISSATISFACTION:
-   - If the user asks for a specific style ("corner arcs", "organic waves", "cyber tech", "luxury gold"), set "layout_style" to that style.
-   - If the user asks for a redesign or gives negative/dissatisfaction feedback (e.g. "redesign this", "different design", "fresh look", "this design is very bad", "i don't like it", "looks bad", "hate this design", "not what i wanted"):
-     * You MUST choose a DIFFERENT "layout_style", a DIFFERENT "composition_variant" (chosen from the 6 variants), and an appropriate "theme" to provide a truly fresh, upgraded look!
+   - If the user asks for a specific style, set "layout_style" to that style.
+   - If the user asks for a redesign or gives negative/dissatisfaction feedback (e.g. "redesign this", "different design", "fresh look", "this design is very bad", "i don't like it", "looks bad", "hate this design", "not what i wanted", "একই ডিজাইন দিচ্ছে কেন", "অন্য ডিজাইন দাও"):
+     * You MUST choose a DIFFERENT "layout_style" (chosen from the 12 styles), a DIFFERENT "composition_variant" (chosen from the 6 variants), and an appropriate "theme" to provide a truly fresh, upgraded, bespoke look!
    - ONLY change "theme" when the user explicitly asks to change colors (e.g. "make it red", "change background to black", "change accent to green") or during a redesign.
 
 6. THEME COLOR SPECIFICATION:
@@ -93,14 +106,6 @@ YOUR TASK & CORE RULES:
        "text_secondary": [r, g, b],
        "text_muted": [r, g, b]
      }
-   - Default for organic_waves:
-     bg_card: [22, 37, 54], accent: [245, 166, 35], accent_secondary: [217, 83, 47], text_primary: [255, 255, 255], text_secondary: [245, 166, 35], text_muted: [200, 210, 220]
-   - Default for corner_arcs:
-     bg_card: [26, 32, 38], accent: [245, 95, 30], accent_secondary: [210, 70, 20], text_primary: [255, 255, 255], text_secondary: [200, 210, 220], text_muted: [175, 185, 195]
-   - Default for cyber_tech:
-     bg_card: [10, 16, 28], accent: [0, 229, 255], accent_secondary: [56, 189, 248], text_primary: [255, 255, 255], text_secondary: [0, 229, 255], text_muted: [148, 163, 184]
-   - Default for luxury_gold:
-     bg_card: [13, 15, 20], accent: [212, 175, 55], accent_secondary: [245, 215, 127], text_primary: [255, 255, 255], text_secondary: [212, 175, 55], text_muted: [205, 210, 220]
 
 7. ZERO HALLUCINATION & COMPREHENSIVE VISITING CARD DATA SCHEMA:
    - Never invent dummy phone numbers, fake emails, or placeholder addresses.
@@ -108,12 +113,12 @@ YOUR TASK & CORE RULES:
      * "name": Full name string.
      * "designation": Professional title / role string.
      * "department": Department or division string.
-     * "qualifications": Array of degrees / certifications [string] (e.g. ["MBBS (DMC)", "FCPS", "PhD in AI"]). If none, [].
+     * "qualifications": Array of degrees / certifications [string]. If none, [].
      * "company_name": Organization, company, or clinic name string.
      * "tagline": Company slogan, motto, or subtitle string.
-     * "phone": Array of phone numbers [string] (e.g. ["+880 1837000000", "+880 1700111222"]). If none, [].
-     * "email": Array of email addresses [string] (e.g. ["mamun@techvision.com", "info@mamun.dev"]). If none, [].
-     * "website": Array of website URLs [string] (e.g. ["https://www.techvision.com.bd"]). If none, [].
+     * "phone": Array of phone numbers [string]. If none, [].
+     * "email": Array of email addresses [string]. If none, [].
+     * "website": Array of website URLs [string]. If none, [].
      * "address": Full street or chamber address string.
      * "branch": Branch, chamber, or office location string.
      * "city": City or district string.
@@ -127,14 +132,14 @@ YOUR TASK & CORE RULES:
      * "theme": Color theme dictionary with RGB values.
 
 8. LANGUAGE & ASSISTANT MESSAGE RULE:
-   - Always write "assistant_message" in fluent, professional, courteous English (e.g., "I've updated your visiting card information and preserved your existing layout style.").
+   - Always write "assistant_message" in fluent, professional, courteous English (e.g., "I've created an agency-grade visiting card tailored to your professional identity.").
    - Even if the user instruction is in another language, always deliver the assistant explanation in English.
 
 Return ONLY a JSON object:
 {
   "assistant_message": string,
   "card_state": {
-    "layout_style": "organic_waves" | "corner_arcs" | "cyber_tech" | "luxury_gold",
+    "layout_style": "corporate_clean" | "luxury_gold" | "cyber_tech" | "minimalist_modern" | "medical_clinical" | "creative_studio" | "nature_botanical" | "corner_arcs" | "organic_waves" | "bold_editorial" | "artisan_craft" | "neon_duotone",
     "composition_variant": "left_monogram_stack" | "centered_hero" | "split_diagonal" | "right_aligned_monogram" | "top_banner" | "asymmetric_offset",
     "name": string,
     "designation": string,
@@ -266,27 +271,103 @@ DEFAULT_THEMES = {
         'text_secondary': [212, 175, 55],
         'text_muted': [205, 210, 220]
     },
+    'corporate_clean': {
+        'bg_card': [15, 23, 42],
+        'accent': [56, 189, 248],
+        'accent_secondary': [148, 163, 184],
+        'text_primary': [255, 255, 255],
+        'text_secondary': [203, 213, 225],
+        'text_muted': [148, 163, 184]
+    },
+    'minimalist_modern': {
+        'bg_card': [18, 20, 24],
+        'accent': [226, 232, 240],
+        'accent_secondary': [160, 174, 192],
+        'text_primary': [255, 255, 255],
+        'text_secondary': [226, 232, 240],
+        'text_muted': [140, 150, 165]
+    },
+    'medical_clinical': {
+        'bg_card': [11, 28, 44],
+        'accent': [45, 212, 191],
+        'accent_secondary': [56, 189, 248],
+        'text_primary': [255, 255, 255],
+        'text_secondary': [45, 212, 191],
+        'text_muted': [170, 200, 215]
+    },
+    'creative_studio': {
+        'bg_card': [24, 20, 37],
+        'accent': [244, 114, 182],
+        'accent_secondary': [168, 85, 247],
+        'text_primary': [255, 255, 255],
+        'text_secondary': [244, 114, 182],
+        'text_muted': [195, 180, 215]
+    },
+    'nature_botanical': {
+        'bg_card': [16, 34, 26],
+        'accent': [163, 230, 53],
+        'accent_secondary': [217, 249, 157],
+        'text_primary': [255, 255, 255],
+        'text_secondary': [163, 230, 53],
+        'text_muted': [180, 210, 190]
+    },
+    'bold_editorial': {
+        'bg_card': [20, 20, 22],
+        'accent': [239, 68, 68],
+        'accent_secondary': [255, 255, 255],
+        'text_primary': [255, 255, 255],
+        'text_secondary': [239, 68, 68],
+        'text_muted': [180, 180, 185]
+    },
+    'artisan_craft': {
+        'bg_card': [33, 23, 18],
+        'accent': [245, 158, 11],
+        'accent_secondary': [217, 119, 6],
+        'text_primary': [255, 255, 255],
+        'text_secondary': [245, 158, 11],
+        'text_muted': [210, 190, 175]
+    },
+    'neon_duotone': {
+        'bg_card': [14, 10, 28],
+        'accent': [192, 132, 252],
+        'accent_secondary': [34, 211, 238],
+        'text_primary': [255, 255, 255],
+        'text_secondary': [34, 211, 238],
+        'text_muted': [180, 170, 210]
+    },
 }
 
 def detect_style_intent(text: str) -> str | None:
     if not text:
         return None
-    # Strip URLs and emails to avoid matching keywords within them (e.g. user@techvision.com, https://goldencorp.io)
     cleaned = re.sub(r'[\w.+-]+@[\w-]+\.[\w.-]+', ' ', text)
     cleaned = re.sub(r'https?://\S+|www\.\S+', ' ', cleaned)
     t = cleaned.lower()
 
-    if re.search(r'\bcorner[\s_-]?arcs?\b', t):
+    if re.search(r'\bcorner[\s_-]?arcs?\b', t) or 'আর্ক স্টাইল' in t:
         return 'corner_arcs'
-    if re.search(r'\borganic[\s_-]?waves?\b', t):
+    if re.search(r'\borganic[\s_-]?waves?\b', t) or 'ওয়েভ স্টাইল' in t:
         return 'organic_waves'
-    if re.search(r'\b(?:cyber[\s_-]?tech|cyber)\b', t):
+    if re.search(r'\b(?:cyber[\s_-]?tech|cyber)\b', t) or re.search(r'\btech\s+style\b', t) or 'সাইবার স্টাইল' in t or 'টেক স্টাইল' in t:
         return 'cyber_tech'
-    # Match 'tech' or 'IT' (uppercase) only when referring to tech style or department, not pronoun 'it'
-    if re.search(r'\btech\b', t) or re.search(r'\bIT\b', cleaned):
-        return 'cyber_tech'
-    if re.search(r'\b(?:luxury[\s_-]?gold|luxury|gold)\b', t):
+    if re.search(r'\b(?:luxury[\s_-]?gold|luxury)\b', t) or re.search(r'\bgold\s+style\b', t) or 'লাক্সারি স্টাইল' in t or 'গোল্ডেন স্টাইল' in t:
         return 'luxury_gold'
+    if re.search(r'\b(?:corporate[\s_-]?clean)\b', t) or re.search(r'\bcorporate\s+style\b', t) or 'কর্পোরেট স্টাইল' in t:
+        return 'corporate_clean'
+    if re.search(r'\b(?:minimalist[\s_-]?modern|minimalist)\b', t) or re.search(r'\bminimal\s+style\b', t) or 'মিনিমালিস্ট স্টাইল' in t or 'মিনিমাল স্টাইল' in t:
+        return 'minimalist_modern'
+    if re.search(r'\b(?:medical[\s_-]?clinical)\b', t) or re.search(r'\bmedical\s+style\b', t) or 'মেডিকেল স্টাইল' in t:
+        return 'medical_clinical'
+    if re.search(r'\b(?:creative[\s_-]?studio)\b', t) or re.search(r'\bcreative\s+style\b', t) or 'ক্রিয়েটিভ স্টাইল' in t:
+        return 'creative_studio'
+    if re.search(r'\b(?:nature[\s_-]?botanical)\b', t) or re.search(r'\bbotanical\s+style\b', t) or 'বোটানিক্যাল স্টাইল' in t:
+        return 'nature_botanical'
+    if re.search(r'\b(?:bold[\s_-]?editorial)\b', t) or re.search(r'\beditorial\s+style\b', t) or 'ম্যাগাজিন স্টাইল' in t:
+        return 'bold_editorial'
+    if re.search(r'\b(?:artisan[\s_-]?craft)\b', t) or re.search(r'\bartisan\s+style\b', t) or 'ক্রাফট স্টাইল' in t:
+        return 'artisan_craft'
+    if re.search(r'\b(?:neon[\s_-]?duotone|cyberpunk)\b', t) or re.search(r'\bneon\s+style\b', t) or 'নিয়ন স্টাইল' in t:
+        return 'neon_duotone'
 
     return None
 
@@ -359,12 +440,17 @@ def detect_redesign_intent(text: str) -> bool:
 
     # Bengali redesign & dissatisfaction phrases
     bengali_redesign_keywords = [
-        'ডিজাইন চ্যাঞ্জ', 'ডিজাইন চেঞ্জ', 'ডিজাইন পরিবর্তন', 'ডিজাইন বদল', 'টেমপ্লেট পরিবর্তন',
-        'টেমপ্লেট চ্যাঞ্জ', 'টেমপ্লেট চেঞ্জ', 'অন্য ডিজাইন', 'অন্য টেমপ্লেট', 'নতুন ডিজাইন',
-        'নতুন লুক', 'নতুন টেমপ্লেট', 'স্টাইল চ্যাঞ্জ', 'স্টাইল চেঞ্জ', 'স্টাইল পরিবর্তন',
-        'লেআউট চ্যাঞ্জ', 'লেআউট চেঞ্জ', 'লেআউট পরিবর্তন', 'ডিজাইন ভালো না', 'ডিজাইন ফালতু',
-        'একই ডিজাইন', 'একই টেমপ্লেট', 'ডিজাইন পছন্দ হয়নি', 'অন্য স্টাইল', 'ডিজাইন বদলাও',
-        'টেমপ্লেট বদলাও', 'চ্যাঞ্জ কর', 'চেঞ্জ কর', 'পরিবর্তন কর'
+        'ডিজাইন চ্যাঞ্জ', 'ডিজাইন চেঞ্জ', 'ডিজাইন পরিবর্তন', 'ডিজাইন বদল', 'ডিজাইন বদলাও',
+        'টেমপ্লেট পরিবর্তন', 'টেমপ্লেট চ্যাঞ্জ', 'টেমপ্লেট চেঞ্জ', 'টেমপ্লেট বদলাও',
+        'অন্য ডিজাইন', 'অন্য কোনো ডিজাইন', 'অন্য কোন ডিজাইন', 'অন্য টেমপ্লেট', 'অন্য কোনো টেমপ্লেট',
+        'নতুন ডিজাইন', 'নতুন কোনো ডিজাইন', 'নতুন লুক', 'নতুন টেমপ্লেট', 'নতুন করে', 'নতুন একটা',
+        'আরেকটা ডিজাইন', 'আরেকটি ডিজাইন', 'আরেকটা দাও', 'আরেকটি দাও',
+        'স্টাইল চ্যাঞ্জ', 'স্টাইল চেঞ্জ', 'স্টাইল পরিবর্তন', 'অন্য স্টাইল', 'অন্য কোনো স্টাইল',
+        'লেআউট চ্যাঞ্জ', 'লেআউট চেঞ্জ', 'লেআউট পরিবর্তন', 'অন্য লেআউট',
+        'ডিজাইন ভালো না', 'ডিজাইন ফালতু', 'ভালো লাগছে না', 'সুন্দর লাগছে না', 'সুন্দর না',
+        'একই ডিজাইন', 'একই টেমপ্লেট', 'একই রকম', 'বার বার একই', 'বারবার একই', 'সব সময় একই',
+        'ডিজাইন পছন্দ হয়নি', 'ডিজাইন পছন্দ না', 'পছন্দ হয়নি', 'পছন্দ না', 'পছন্দ হচ্ছে না',
+        'চ্যাঞ্জ কর', 'চেঞ্জ কর', 'পরিবর্তন কর', 'বদলাও'
     ]
     if any(k in t for k in bengali_redesign_keywords):
         return True
@@ -433,11 +519,15 @@ def get_next_fresh_layout_style(seed_text: str | None = None) -> str:
     Diverse layout selector fallback when LLM provides no valid style.
     Uses prompt/text hash to ensure diversity without cross-user database queries.
     """
-    available_styles = ['organic_waves', 'cyber_tech', 'luxury_gold', 'corner_arcs']
+    available_styles = [
+        'corporate_clean', 'luxury_gold', 'cyber_tech', 'minimalist_modern',
+        'medical_clinical', 'creative_studio', 'nature_botanical', 'corner_arcs',
+        'organic_waves', 'bold_editorial', 'artisan_craft', 'neon_duotone'
+    ]
     if seed_text:
         idx = abs(hash(seed_text)) % len(available_styles)
         return available_styles[idx]
-    return 'luxury_gold'
+    return 'corporate_clean'
 
 
 def process_card_agent_turn(session_id: str | None, user_message: str, request=None) -> dict:
@@ -586,24 +676,33 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
         logger.info(f"Session {session.id} v{version}: Redesign / dissatisfaction intent detected. Bypassing deterministic override.")
 
         # Layout style
-        current_style = current_state.get('layout_style', 'corner_arcs')
-        styles = ['organic_waves', 'cyber_tech', 'luxury_gold', 'corner_arcs']
-        if explicit_style:
+        current_style = current_state.get('layout_style', 'corporate_clean')
+        styles = [
+            'corporate_clean', 'luxury_gold', 'cyber_tech', 'minimalist_modern',
+            'medical_clinical', 'creative_studio', 'nature_botanical', 'corner_arcs',
+            'organic_waves', 'bold_editorial', 'artisan_craft', 'neon_duotone'
+        ]
+        tech_styles = ['cyber_tech', 'neon_duotone', 'minimalist_modern', 'corporate_clean', 'creative_studio']
+        if explicit_style and explicit_style != current_style:
             updated_state['layout_style'] = explicit_style
         else:
             gpt_style = updated_state.get('layout_style')
             if gpt_style and gpt_style in DEFAULT_THEMES and gpt_style != current_style:
                 updated_state['layout_style'] = gpt_style
             else:
-                if current_style in styles:
+                if current_style in tech_styles:
+                    avail_tech = [s for s in tech_styles if s != current_style]
+                    seed_idx = abs(hash(user_message + str(version))) % len(avail_tech)
+                    updated_state['layout_style'] = avail_tech[seed_idx]
+                elif current_style in styles:
                     next_idx = (styles.index(current_style) + 1) % len(styles)
                     updated_state['layout_style'] = styles[next_idx]
                 else:
                     updated_state['layout_style'] = get_next_fresh_layout_style(seed_text=user_message)
 
-        # Composition variant
+        # Composition variant: GUARANTEED different from current_comp
         current_comp = current_state.get('composition_variant', DEFAULT_COMPOSITION_VARIANT)
-        if explicit_composition:
+        if explicit_composition and explicit_composition != current_comp:
             updated_state['composition_variant'] = explicit_composition
         else:
             gpt_comp = updated_state.get('composition_variant')
@@ -612,11 +711,13 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
             else:
                 updated_state['composition_variant'] = get_next_fresh_composition(last_variant=current_comp)
 
-        # Theme
-        if updated_state.get('theme') and updated_state.get('theme') != current_state.get('theme'):
+        # Theme: GUARANTEED different from current_theme
+        current_theme = current_state.get('theme') or {}
+        new_style_theme = DEFAULT_THEMES.get(updated_state['layout_style'], DEFAULT_THEMES['corporate_clean'])
+        if updated_state.get('theme') and updated_state.get('theme') != current_theme:
             pass
         else:
-            updated_state['theme'] = DEFAULT_THEMES.get(updated_state['layout_style'], DEFAULT_THEMES['organic_waves'])
+            updated_state['theme'] = new_style_theme
     elif explicit_style or explicit_composition:
         # 3. Explicit style or composition request without full redesign
         if explicit_style:
@@ -675,7 +776,7 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
         else:
             updated_state['monogram'] = updated_state['name'][:2].upper()
 
-    # 5. Generate Visiting Card via Precision Vector Engine (Controlled by AI Decisions)
+    # 5. Generate Visiting Card via Dynamic AI Canvas or Vector Engine (Strictly 1200x700 PNG)
     if not api_key:
         err_msg = "OpenAI API key not configured — card generation requires an active key."
         send_openai_error_notification(err_msg)
@@ -683,16 +784,36 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
 
     t_img_start = time.time()
     existing_code = current_state.get('_python_code')
-    if existing_code and not is_new_session and not is_redesign:
+    working_code = None
+
+    if is_new_session or is_redesign or not existing_code:
         try:
-            refine_card_code(existing_code, updated_state, user_message, api_key)
+            generated_code = generate_card_code(updated_state, user_message, api_key)
+            if generated_code and 'def draw_visiting_card' in generated_code:
+                working_code = generated_code
+                updated_state['_python_code'] = working_code
+        except Exception as gen_err:
+            logger.debug(f"Dynamic code generation pass: {gen_err}")
+    else:
+        try:
+            refined_code = refine_card_code(existing_code, updated_state, user_message, api_key)
+            if refined_code and 'def draw_visiting_card' in refined_code:
+                working_code = refined_code
+                updated_state['_python_code'] = working_code
+            else:
+                working_code = existing_code
+                updated_state['_python_code'] = existing_code
         except Exception as ref_err:
-            logger.debug(f"Refinement pass: {ref_err}")
+            logger.debug(f"Dynamic code refinement pass: {ref_err}")
+            working_code = existing_code
+            updated_state['_python_code'] = existing_code
+
+    if not updated_state.get('_python_code'):
+        updated_state['_python_code'] = working_code or f"# Visiting Card Vector Engine: {updated_state.get('layout_style')} / {updated_state.get('composition_variant')}"
 
     try:
         image_bytes = generate_business_card(updated_state)
-        updated_state['_python_code'] = f"# Visiting Card Vector Engine: {updated_state.get('layout_style')} / {updated_state.get('composition_variant')}"
-        logger.info(f"Vector card rendering took: {time.time() - t_img_start:.3f}s")
+        logger.info(f"Visiting card rendering took: {time.time() - t_img_start:.3f}s")
     except Exception as e:
         logger.error(f"Vector card rendering failed for session {session.id}: {e}")
         send_openai_error_notification(f"AI card rendering failed: {e}")

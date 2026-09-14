@@ -229,12 +229,10 @@ def draw_micro_contact(draw, x: int, y: int, ctype: str, val: str, accent: tuple
 # Decorative Accents per Layout Style
 # -------------------------------------------------------------
 def draw_cyber_tech_accents(draw, w, h, s, accent, accent_sec):
-    # Sleek tech hairline perimeter frame
     inset = s(32)
     border_c = adjust_color(accent, 0.35)
     draw.rectangle([inset, inset, w - inset, h - inset], outline=border_c, width=s(1))
 
-    # Corner brackets
     blen = s(45)
     # Top-left
     draw.line([(inset, inset), (inset + blen, inset)], fill=accent, width=s(2))
@@ -249,12 +247,10 @@ def draw_cyber_tech_accents(draw, w, h, s, accent, accent_sec):
     draw.line([(w - inset, h - inset), (w - inset - blen, h - inset)], fill=accent, width=s(2))
     draw.line([(w - inset, h - inset), (w - inset, h - inset - blen)], fill=accent, width=s(2))
 
-    # Corner crosshair registration marks (+)
     for cx, cy in [(inset, inset), (w - inset, inset), (inset, h - inset), (w - inset, h - inset)]:
         draw.line([(cx - s(12), cy), (cx + s(12), cy)], fill=accent_sec, width=s(1))
         draw.line([(cx, cy - s(12)), (cx, cy + s(12))], fill=accent_sec, width=s(1))
 
-    # Micro dot-matrix cluster in top-right
     dot_c = adjust_color(accent, 0.28)
     for r in range(5):
         for c in range(6):
@@ -262,57 +258,47 @@ def draw_cyber_tech_accents(draw, w, h, s, accent, accent_sec):
             dy = inset + s(20) + r * s(16)
             draw.ellipse([dx - s(2), dy - s(2), dx + s(2), dy + s(2)], fill=dot_c)
 
-    # Tech watermark tag in bottom right
     font_micro = get_font(s(14), bold=True)
     draw_tracked_text(draw, w - inset - s(240), h - inset - s(18), "// SYS.ID 01-X", font=font_micro, fill=adjust_color(accent, 0.45), spacing=s(3))
 
 
 def draw_corner_arcs_accents(draw, w, h, s, accent, accent_sec):
-    # Inset framing
     inset = s(32)
     border_c = adjust_color(accent, 0.3)
     draw.rectangle([inset, inset, w - inset, h - inset], outline=border_c, width=s(1))
 
-    # Architectural wireframe concentric arcs in top-right
     for radius_offset in [s(160), s(220), s(280)]:
         col = accent if radius_offset == s(220) else accent_sec
         draw.arc([w - radius_offset, -radius_offset // 2, w + radius_offset // 2, radius_offset], start=90, end=180, fill=col, width=s(1))
 
-    # Bottom-left counter arcs
     for radius_offset in [s(140), s(200)]:
         draw.arc([-radius_offset // 2, h - radius_offset, radius_offset, h + radius_offset // 2], start=270, end=360, fill=border_c, width=s(1))
 
-    # Precision corner tick marks
     for cx, cy in [(inset, inset), (w - inset, inset), (inset, h - inset), (w - inset, h - inset)]:
         draw.line([(cx - s(14), cy), (cx + s(14), cy)], fill=accent, width=s(1))
         draw.line([(cx, cy - s(14)), (cx, cy + s(14))], fill=accent, width=s(1))
 
 
 def draw_luxury_gold_accents(draw, w, h, s, gold, gold_light):
-    # Double gold hairline borders
     inset1 = s(28)
     inset2 = s(38)
     draw.rectangle([inset1, inset1, w - inset1, h - inset1], outline=gold, width=s(2))
     draw.rectangle([inset2, inset2, w - inset2, h - inset2], outline=gold_light, width=s(1))
 
-    # Precision corner crosshairs (+)
     tlen = s(20)
     for cx, cy in [(inset1, inset1), (w - inset1, inset1), (inset1, h - inset1), (w - inset1, h - inset1)]:
         draw.line([(cx - tlen, cy), (cx + tlen, cy)], fill=gold, width=s(1))
         draw.line([(cx, cy - tlen), (cx, cy + tlen)], fill=gold, width=s(1))
 
-    # Corner diamond micro-notches at inner border
     for cx, cy in [(inset2, inset2), (w - inset2, inset2), (inset2, h - inset2), (w - inset2, h - inset2)]:
         draw.polygon([(cx, cy - s(5)), (cx + s(5), cy), (cx, cy + s(5)), (cx - s(5), cy)], fill=gold_light)
 
 
 def draw_organic_waves_accents(draw, img, w, h, s, accent_1, accent_2, bg_color):
-    # Inset minimalist border
     inset = s(32)
     border_c = adjust_color(accent_1, 0.3)
     draw.rectangle([inset, inset, w - inset, h - inset], outline=border_c, width=s(1))
 
-    # Subtle topographical contour filaments in upper quadrant
     for i, offset_y in enumerate([s(80), s(110), s(140)]):
         wave_pts = []
         c = accent_1 if i == 1 else adjust_color(accent_2, 0.4)
@@ -321,7 +307,6 @@ def draw_organic_waves_accents(draw, img, w, h, s, accent_1, accent_2, bg_color)
             wave_pts.append((x, y))
         draw.line(wave_pts, fill=c, width=s(1), joint='curve')
 
-    # Counter curves bottom right
     for i, offset_y in enumerate([s(60), s(90)]):
         wave_pts = []
         c = adjust_color(accent_1, 0.35)
@@ -331,10 +316,80 @@ def draw_organic_waves_accents(draw, img, w, h, s, accent_1, accent_2, bg_color)
             wave_pts.append((x, y))
         draw.line(wave_pts, fill=c, width=s(1), joint='curve')
 
-    # Corner ticks
     for cx, cy in [(inset, inset), (w - inset, inset), (inset, h - inset), (w - inset, h - inset)]:
         draw.line([(cx - s(12), cy), (cx + s(12), cy)], fill=accent_1, width=s(1))
         draw.line([(cx, cy - s(12)), (cx, cy + s(12))], fill=accent_1, width=s(1))
+
+
+def draw_corporate_clean_accents(draw, w, h, s, accent, accent_sec):
+    inset = s(30)
+    draw.rectangle([inset, inset, w - inset, h - inset], outline=adjust_color(accent, 0.3), width=s(1))
+    draw.line([(inset, inset), (inset + s(180), inset)], fill=accent, width=s(4))
+    draw.line([(inset, inset), (inset, inset + s(100))], fill=accent, width=s(4))
+    draw.line([(w - inset - s(80), h - inset), (w - inset, h - inset)], fill=accent_sec, width=s(2))
+
+
+def draw_minimalist_modern_accents(draw, w, h, s, accent, accent_sec):
+    inset = s(40)
+    draw.rectangle([inset, inset, w - inset, h - inset], outline=adjust_color(accent, 0.25), width=s(1))
+    tlen = s(12)
+    for cx, cy in [(inset, inset), (w - inset, inset), (inset, h - inset), (w - inset, h - inset)]:
+        draw.line([(cx - tlen, cy), (cx + tlen, cy)], fill=accent, width=s(1))
+        draw.line([(cx, cy - tlen), (cx, cy + tlen)], fill=accent, width=s(1))
+
+
+def draw_medical_clinical_accents(draw, w, h, s, accent, accent_sec):
+    inset = s(32)
+    draw.rectangle([inset, inset, w - inset, h - inset], outline=adjust_color(accent, 0.25), width=s(1))
+    for cx, cy in [(inset + s(20), inset + s(20)), (w - inset - s(20), inset + s(20))]:
+        draw.line([(cx - s(8), cy), (cx + s(8), cy)], fill=accent, width=s(2))
+        draw.line([(cx, cy - s(8)), (cx, cy + s(8))], fill=accent, width=s(2))
+    pulse_x = w - inset - s(240)
+    pulse_y = h - inset - s(20)
+    pts = [
+        (pulse_x, pulse_y),
+        (pulse_x + s(30), pulse_y),
+        (pulse_x + s(40), pulse_y - s(14)),
+        (pulse_x + s(50), pulse_y + s(14)),
+        (pulse_x + s(60), pulse_y),
+        (pulse_x + s(100), pulse_y)
+    ]
+    draw.line(pts, fill=adjust_color(accent, 0.5), width=s(1))
+
+
+def draw_creative_studio_accents(draw, w, h, s, accent, accent_sec):
+    inset = s(28)
+    draw.rectangle([inset, inset, w - inset, h - inset], outline=adjust_color(accent, 0.35), width=s(2))
+    draw.polygon([(inset, inset), (inset + s(70), inset), (inset, inset + s(70))], fill=accent)
+    draw.line([(inset + s(80), inset), (inset, inset + s(80))], fill=accent_sec, width=s(2))
+
+
+def draw_nature_botanical_accents(draw, w, h, s, accent, accent_sec):
+    inset = s(32)
+    draw.rectangle([inset, inset, w - inset, h - inset], outline=adjust_color(accent, 0.35), width=s(1))
+    draw.rectangle([inset + s(8), inset + s(8), w - inset - s(8), h - inset - s(8)], outline=adjust_color(accent_sec, 0.2), width=s(1))
+    for cx, cy in [(inset, inset), (w - inset, inset), (inset, h - inset), (w - inset, h - inset)]:
+        draw.ellipse([cx - s(4), cy - s(4), cx + s(4), cy + s(4)], fill=accent)
+
+
+def draw_bold_editorial_accents(draw, w, h, s, accent, accent_sec):
+    inset = s(25)
+    draw.rectangle([inset, inset, w - inset, inset + s(6)], fill=accent)
+    draw.rectangle([inset, inset, w - inset, h - inset], outline=adjust_color(accent, 0.4), width=s(1))
+
+
+def draw_artisan_craft_accents(draw, w, h, s, accent, accent_sec):
+    inset = s(30)
+    draw.rectangle([inset, inset, w - inset, h - inset], outline=accent, width=s(2))
+    draw.rectangle([inset + s(10), inset + s(10), w - inset - s(10), h - inset - s(10)], outline=adjust_color(accent_sec, 0.4), width=s(1))
+
+
+def draw_neon_duotone_accents(draw, w, h, s, accent, accent_sec):
+    inset = s(30)
+    draw.rectangle([inset, inset, w - inset, h - inset], outline=adjust_color(accent, 0.4), width=s(1))
+    blen = s(50)
+    draw.line([(inset, inset), (inset + blen, inset)], fill=accent, width=s(2))
+    draw.line([(w - inset - blen, h - inset), (w - inset, h - inset)], fill=accent_sec, width=s(2))
 
 
 # -------------------------------------------------------------
@@ -344,37 +399,50 @@ def render_monogram_emblem(draw, cx, cy, radius, monogram, layout_style, accent,
     """
     Renders a bespoke brand seal / emblem tailored to layout_style with clean multi-ring geometry.
     """
-    if layout_style == 'cyber_tech':
-        # Double precision hexagon
+    style = str(layout_style).lower()
+    if style == 'cyber_tech' or style == 'neon_duotone':
         for rad, col, w_val in [(radius, accent, s(2)), (radius - s(10), accent_sec, s(1))]:
             pts = []
             for i in range(6):
                 ang = math.radians(60 * i - 30)
                 pts.append((cx + int(rad * math.cos(ang)), cy + int(rad * math.sin(ang))))
             draw.polygon(pts, outline=col, width=w_val)
-        # Vertices node dots
         for i in range(6):
             ang = math.radians(60 * i - 30)
             nx = cx + int(radius * math.cos(ang))
             ny = cy + int(radius * math.sin(ang))
             draw.ellipse([nx - s(3), ny - s(3), nx + s(3), ny + s(3)], fill=accent)
-    elif layout_style == 'luxury_gold':
-        # Multi-ring gold crest with cardinal diamond ticks
+    elif style == 'luxury_gold' or style == 'artisan_craft':
         draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], outline=accent, width=s(2))
         draw.ellipse([cx - radius + s(8), cy - radius + s(8), cx + radius - s(8), cy + radius - s(8)], outline=accent_sec, width=s(1))
-        # 4 cardinal diamond pips (North, South, East, West)
         for dx, dy in [(0, -radius), (0, radius), (-radius, 0), (radius, 0)]:
             px, py = cx + dx, cy + dy
             draw.polygon([(px, py - s(5)), (px + s(5), py), (px, py + s(5)), (px - s(5), py)], fill=accent)
-    elif layout_style == 'corner_arcs':
-        # Modern architectural concentric seal
+    elif style == 'medical_clinical':
+        # Shield with clinical plus
+        draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], outline=accent, width=s(2))
+        draw.ellipse([cx - radius + s(6), cy - radius + s(6), cx + radius - s(6), cy + radius - s(6)], outline=accent_sec, width=s(1))
+        p_len = s(6)
+        draw.line([(cx - p_len, cy - radius + s(14)), (cx + p_len, cy - radius + s(14))], fill=accent, width=s(2))
+        draw.line([(cx, cy - radius + s(14) - p_len), (cx, cy - radius + s(14) + p_len)], fill=accent, width=s(2))
+    elif style == 'corporate_clean' or style == 'bold_editorial':
+        # Sharp architectural square seal
+        draw.rounded_rectangle([cx - radius, cy - radius, cx + radius, cy + radius], radius=s(6), outline=accent, width=s(2))
+        draw.rounded_rectangle([cx - radius + s(8), cy - radius + s(8), cx + radius - s(8), cy + radius - s(8)], radius=s(4), outline=accent_sec, width=s(1))
+    elif style == 'creative_studio':
+        # Diamond crest
+        pts = [(cx, cy - radius), (cx + radius, cy), (cx, cy + radius), (cx - radius, cy)]
+        draw.polygon(pts, outline=accent, width=s(2))
+        pts_in = [(cx, cy - radius + s(10)), (cx + radius - s(10), cy), (cx, cy + radius - s(10)), (cx - radius + s(10), cy)]
+        draw.polygon(pts_in, outline=accent_sec, width=s(1))
+    elif style == 'nature_botanical':
         draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], outline=accent, width=s(2))
         draw.ellipse([cx - radius + s(8), cy - radius + s(8), cx + radius - s(8), cy + radius - s(8)], outline=accent_sec, width=s(1))
-    else:  # organic_waves
+        draw.ellipse([cx - s(4), cy - radius - s(2), cx + s(4), cy - radius + s(6)], fill=accent)
+    else:  # corner_arcs, organic_waves, minimalist_modern, etc.
         draw.ellipse([cx - radius, cy - radius, cx + radius, cy + radius], outline=accent, width=s(2))
-        draw.ellipse([cx - radius + s(7), cy - radius + s(7), cx + radius - s(7), cy + radius - s(7)], outline=accent_sec, width=s(1))
+        draw.ellipse([cx - radius + s(8), cy - radius + s(8), cx + radius - s(8), cy + radius - s(8)], outline=accent_sec, width=s(1))
 
-    # Monogram text inside seal
     font_size = int(radius * 0.78)
     font_mono = get_font(font_size, bold=True)
     mb = draw.textbbox((0, 0), monogram, font=font_mono)
@@ -418,6 +486,7 @@ def render_top_banner(draw, img, data, w, h, s, theme, layout_style):
     draw.line([(comp_x, comp_y + th_comp + s(14)), (comp_x + tw_comp, comp_y + th_comp + s(14))], fill=accent, width=s(2))
 
     # 2. Bottom Left: Name & Designation
+    rx = w - s(520)
     name_x = s(120)
     name_y = h - s(270)
     if name:
@@ -428,9 +497,15 @@ def render_top_banner(draw, img, data, w, h, s, theme, layout_style):
         draw.text((name_x, name_y), name, font=font_name, fill=text_primary)
 
     if desig:
-        font_des = get_font(s(22), bold=True)
+        font_des = get_font(s(20), bold=True)
+        des_spacing = s(5)
+        max_left_w = rx - name_x - s(40)
+        sample_w = sum(draw.textbbox((0, 0), ch, font=font_des)[2] - draw.textbbox((0, 0), ch, font=font_des)[0] + des_spacing for ch in desig) - des_spacing
+        if sample_w > max_left_w:
+            font_des = get_font(s(15), bold=True)
+            des_spacing = s(3)
         des_y = name_y + s(70)
-        draw_tracked_text(draw, name_x, des_y, desig, font=font_des, fill=accent, spacing=s(7))
+        draw_tracked_text(draw, name_x, des_y, desig, font=font_des, fill=accent, spacing=des_spacing)
 
     # 3. Right Side: Micro-Labeled Contacts Stack
     contacts = get_contact_items(data)
@@ -809,12 +884,28 @@ def render_vector_visiting_card(data: dict, scale: int = 2) -> Image.Image:
 
     # 2. Render Style-Specific Decorative Accents
     layout_style = (data.get('layout_style') or 'organic_waves').lower()
-    if layout_style == 'cyber_tech':
+    if layout_style in ('cyber_tech', 'tech', 'cyber'):
         draw_cyber_tech_accents(draw, w, h, s, accent, accent_sec)
-    elif layout_style == 'corner_arcs':
+    elif layout_style in ('corner_arcs', 'geometric_arcs'):
         draw_corner_arcs_accents(draw, w, h, s, accent, accent_sec)
-    elif layout_style == 'luxury_gold':
+    elif layout_style in ('luxury_gold', 'luxury', 'gold'):
         draw_luxury_gold_accents(draw, w, h, s, accent, accent_sec)
+    elif layout_style in ('corporate_clean', 'corporate', 'executive'):
+        draw_corporate_clean_accents(draw, w, h, s, accent, accent_sec)
+    elif layout_style in ('minimalist_modern', 'minimalist', 'minimal'):
+        draw_minimalist_modern_accents(draw, w, h, s, accent, accent_sec)
+    elif layout_style in ('medical_clinical', 'medical', 'clinical', 'health'):
+        draw_medical_clinical_accents(draw, w, h, s, accent, accent_sec)
+    elif layout_style in ('creative_studio', 'creative', 'studio'):
+        draw_creative_studio_accents(draw, w, h, s, accent, accent_sec)
+    elif layout_style in ('nature_botanical', 'botanical', 'nature'):
+        draw_nature_botanical_accents(draw, w, h, s, accent, accent_sec)
+    elif layout_style in ('bold_editorial', 'editorial'):
+        draw_bold_editorial_accents(draw, w, h, s, accent, accent_sec)
+    elif layout_style in ('artisan_craft', 'artisan', 'craft'):
+        draw_artisan_craft_accents(draw, w, h, s, accent, accent_sec)
+    elif layout_style in ('neon_duotone', 'duotone'):
+        draw_neon_duotone_accents(draw, w, h, s, accent, accent_sec)
     else:  # organic_waves
         draw_organic_waves_accents(draw, img, w, h, s, accent, accent_sec, bg_color)
         # re-create draw after paste
@@ -825,17 +916,37 @@ def render_vector_visiting_card(data: dict, scale: int = 2) -> Image.Image:
     renderer = COMPOSITION_RENDERERS.get(comp_var, render_left_monogram_stack)
     renderer(draw, img, data, w, h, s, theme, layout_style)
 
-    # 4. Downsample with LANCZOS antialiasing to standard 1200x700
+    # 4. Downsample with LANCZOS antialiasing to strictly standard 1200x700
     final_img = img.resize((1200, 700), Image.Resampling.LANCZOS)
     return final_img
 
 
 def generate_business_card(data: dict) -> bytes:
     """
-    Main vector generation function returning PNG bytes.
-    Guarantees crisp text, zero spelling errors, zero outer mockups/desks, sub-second execution (<0.05s).
+    Main vector generation function returning exact 1200x700 PNG bytes.
+    If dynamic python canvas code is present and executable, executes in the sandbox.
+    Otherwise renders with the high-resolution vector engine.
+    Guarantees crisp text, exact standard dimensions (1200x700), zero outer mockups/desks.
     """
+    code_str = data.get('_python_code')
+    if code_str and isinstance(code_str, str) and 'def draw_visiting_card' in code_str:
+        try:
+            from .dynamic_card_coder import execute_card_code
+            png_bytes, _ = execute_card_code(code_str, card_data=data, max_retries=0)
+            if png_bytes and len(png_bytes) > 1000:
+                # Verify exact 1200x700 dimensions
+                try:
+                    chk_img = Image.open(io.BytesIO(png_bytes))
+                    if chk_img.size == (1200, 700):
+                        return png_bytes
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.debug(f"Dynamic code execution fallback: {e}")
+
     img = render_vector_visiting_card(data, scale=2)
+    if img.size != (1200, 700):
+        img = img.resize((1200, 700), Image.Resampling.LANCZOS)
     buf = io.BytesIO()
     img.save(buf, format='PNG', dpi=(300, 300))
     buf.seek(0)

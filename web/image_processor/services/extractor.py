@@ -1,8 +1,14 @@
+import os
 import base64
 import json
+import logging
 import cv2
+import numpy as np
 import requests
+import concurrent.futures
 from card_project.notifications import send_openai_error_notification, is_openai_error
+
+logger = logging.getLogger(__name__)
 
 FINANCIAL_CARD_TYPES = {"Credit Card", "Debit Card", "ATM Card", "Gift Card"}
 
@@ -23,6 +29,21 @@ PERSONAL_TYPES = [
     "Student ID", "Transport Card", "Travel Card", "Visiting Card"
 ]
 
+_HTTP_SESSION = None
+
+
+def _get_http_session():
+    """
+    Reuses an HTTP session with connection pooling to eliminate TLS handshake latency.
+    """
+    global _HTTP_SESSION
+    if _HTTP_SESSION is None:
+        _HTTP_SESSION = requests.Session()
+        adapter = requests.adapters.HTTPAdapter(pool_connections=10, pool_maxsize=10, max_retries=1)
+        _HTTP_SESSION.mount("https://", adapter)
+        _HTTP_SESSION.mount("http://", adapter)
+    return _HTTP_SESSION
+
 
 def _mask_card_number(number: str) -> str:
     digits = number.replace(" ", "").replace("-", "")
@@ -31,67 +52,29 @@ def _mask_card_number(number: str) -> str:
     return "****  ****  ****  ****"
 
 
-def _extract_text_with_vision(image_b64: str, vision_api_key: str) -> str:
-    if not vision_api_key:
+def _prepare_b64_for_ocr(bgr: np.ndarray, max_dim: int = 1024) -> str:
+    """
+    Downscales image for fast network transmission to Google Vision / OpenAI.
+    """
+    if bgr is None:
         return ""
-    url = f"https://vision.googleapis.com/v1/images:annotate?key={vision_api_key}"
-    payload = {
-        "requests": [
-            {
-                "image": {"content": image_b64},
-                "features": [{"type": "TEXT_DETECTION"}]
-            }
-        ]
-    }
-    try:
-        response = requests.post(url, json=payload, timeout=25)
-        data = response.json()
-        return data["responses"][0]["fullTextAnnotation"]["text"].strip()
-    except Exception:
+    h, w = bgr.shape[:2]
+    if max(h, w) > max_dim:
+        scale = max_dim / float(max(h, w))
+        target_w = int(w * scale)
+        target_h = int(h * scale)
+        small = cv2.resize(bgr, (target_w, target_h), interpolation=cv2.INTER_AREA)
+    else:
+        small = bgr
+    encode_params = [cv2.IMWRITE_JPEG_QUALITY, 80]
+    success, buffer = cv2.imencode(".jpg", small, encode_params)
+    if not success:
         return ""
-
-
-def _detect_rotation_with_vision(image_b64: str, vision_api_key: str) -> int:
-    if not vision_api_key:
-        return 0
-    url = f"https://vision.googleapis.com/v1/images:annotate?key={vision_api_key}"
-    payload = {
-        "requests": [
-            {
-                "image": {"content": image_b64},
-                "features": [{"type": "TEXT_DETECTION"}],
-                "imageContext": {"languageHints": ["en"]}
-            }
-        ]
-    }
-    try:
-        response = requests.post(url, json=payload, timeout=25)
-        data = response.json()
-        pages = data["responses"][0]["fullTextAnnotation"]["pages"]
-        blocks = pages[0]["blocks"]
-        if not blocks:
-            return 0
-
-        vertices = blocks[0]["boundingBox"]["vertices"]
-        v0, v1, v3 = vertices[0], vertices[1], vertices[3]
-        x0, y0 = v0.get("x", 0), v0.get("y", 0)
-        x1, y1 = v1.get("x", 0), v1.get("y", 0)
-        x3, y3 = v3.get("x", 0), v3.get("y", 0)
-
-        if x1 >= x0 and y3 >= y0:
-            return 0
-        elif x1 <= x0 and y3 >= y0:
-            return 90
-        elif x1 <= x0 and y3 <= y0:
-            return 180
-        else:
-            return 270
-    except Exception:
-        return 0
+    return base64.b64encode(buffer).decode("utf-8")
 
 
 def _detect_rotation_and_extract_text(image_b64: str, vision_api_key: str):
-    if not vision_api_key:
+    if not vision_api_key or not image_b64:
         return 0, ""
 
     url = f"https://vision.googleapis.com/v1/images:annotate?key={vision_api_key}"
@@ -108,12 +91,13 @@ def _detect_rotation_and_extract_text(image_b64: str, vision_api_key: str):
     raw_text = ""
 
     try:
-        response = requests.post(url, json=payload, timeout=25)
+        session = _get_http_session()
+        response = session.post(url, json=payload, timeout=20)
         data = response.json()
-        pages = data["responses"][0]["fullTextAnnotation"]["pages"]
-        blocks = pages[0]["blocks"]
+        pages = data.get("responses", [{}])[0].get("fullTextAnnotation", {}).get("pages", [])
 
-        if blocks:
+        if pages and pages[0].get("blocks"):
+            blocks = pages[0]["blocks"]
             vertices = blocks[0]["boundingBox"]["vertices"]
             v0, v1, v3 = vertices[0], vertices[1], vertices[3]
             x0, y0 = v0.get("x", 0), v0.get("y", 0)
@@ -129,11 +113,38 @@ def _detect_rotation_and_extract_text(image_b64: str, vision_api_key: str):
             else:
                 rotation = 270
 
-        raw_text = data["responses"][0]["fullTextAnnotation"]["text"].strip()
-    except Exception:
-        pass
+        raw_text = data.get("responses", [{}])[0].get("fullTextAnnotation", {}).get("text", "").strip()
+    except Exception as e:
+        logger.warning(f"Google Vision API call failed: {e}")
 
     return rotation, raw_text
+
+
+def _rotate_image_upright(bgr: np.ndarray, rotation: int) -> np.ndarray:
+    if bgr is None:
+        return None
+    if rotation == 90:
+        return cv2.rotate(bgr, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    elif rotation == 180:
+        return cv2.rotate(bgr, cv2.ROTATE_180)
+    elif rotation == 270:
+        return cv2.rotate(bgr, cv2.ROTATE_90_CLOCKWISE)
+    return bgr
+
+
+def _process_single_card_ocr(bgr: np.ndarray, vision_api_key: str):
+    """
+    Performs OCR and upright rotation for a single card image.
+    """
+    if bgr is None:
+        return None, ""
+    image_b64 = _prepare_b64_for_ocr(bgr)
+    rotation = 0
+    raw_text = ""
+    if vision_api_key:
+        rotation, raw_text = _detect_rotation_and_extract_text(image_b64, vision_api_key)
+    rotated_bgr = _rotate_image_upright(bgr, rotation)
+    return rotated_bgr, raw_text
 
 
 def _build_prompt(raw_text: str) -> str:
@@ -198,72 +209,56 @@ Rules:
 
 def extract_with_rotation(front_bgr, back_bgr, openai_api_key: str, vision_api_key: str):
     """
-    Rotates front & back correctly, sends OCR text to GPT-4o, and extracts structured data.
+    Rotates front & back correctly, sends OCR text to GPT-4o-mini (4x faster), and extracts structured data.
+    Runs front and back OCR concurrently when both are provided.
     """
     if not openai_api_key:
         err_msg = "OpenAI API key not configured — card extraction requires an active key."
         send_openai_error_notification(err_msg)
         raise ValueError(err_msg)
 
-    rotated_front = front_bgr
-    raw_text = ""
+    # 1. Concurrently process rotation & OCR for front and back
+    if front_bgr is not None and back_bgr is not None:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            front_future = executor.submit(_process_single_card_ocr, front_bgr, vision_api_key)
+            back_future = executor.submit(_process_single_card_ocr, back_bgr, vision_api_key)
+            rotated_front, front_text = front_future.result()
+            rotated_back, back_text = back_future.result()
+    elif front_bgr is not None:
+        rotated_front, front_text = _process_single_card_ocr(front_bgr, vision_api_key)
+        rotated_back, back_text = None, ""
+    elif back_bgr is not None:
+        rotated_front, front_text = None, ""
+        rotated_back, back_text = _process_single_card_ocr(back_bgr, vision_api_key)
+    else:
+        rotated_front, front_text = None, ""
+        rotated_back, back_text = None, ""
 
-    if front_bgr is not None:
-        encode_params = [cv2.IMWRITE_JPEG_QUALITY, 85]
-        success, buffer = cv2.imencode(".jpg", front_bgr, encode_params)
-        image_b64 = base64.b64encode(buffer).decode("utf-8")
+    raw_text = front_text if front_text else ""
+    if back_text:
+        raw_text = (raw_text + "\n---\n" + back_text).strip()
 
-        rotation = 0
-        if vision_api_key:
-            rotation, raw_text = _detect_rotation_and_extract_text(image_b64, vision_api_key)
+    card_model = os.environ.get("OPENAI_CARD_MODEL", "gpt-4o-mini").strip()
+    session = _get_http_session()
 
-        if rotation == 90:
-            rotated_front = cv2.rotate(front_bgr, cv2.ROTATE_90_COUNTERCLOCKWISE)
-        elif rotation == 180:
-            rotated_front = cv2.rotate(front_bgr, cv2.ROTATE_180)
-        elif rotation == 270:
-            rotated_front = cv2.rotate(front_bgr, cv2.ROTATE_90_CLOCKWISE)
-
-    # Process back image rotation
-    rotated_back = back_bgr
-    if back_bgr is not None:
-        encode_params = [cv2.IMWRITE_JPEG_QUALITY, 85]
-        success, buffer = cv2.imencode(".jpg", back_bgr, encode_params)
-        image_b64 = base64.b64encode(buffer).decode("utf-8")
-
-        back_rotation = 0
-        back_text = ""
-        if vision_api_key:
-            back_rotation, back_text = _detect_rotation_and_extract_text(image_b64, vision_api_key)
-
-        if back_rotation == 90:
-            rotated_back = cv2.rotate(back_bgr, cv2.ROTATE_90_COUNTERCLOCKWISE)
-        elif back_rotation == 180:
-            rotated_back = cv2.rotate(back_bgr, cv2.ROTATE_180)
-        elif back_rotation == 270:
-            rotated_back = cv2.rotate(back_bgr, cv2.ROTATE_90_CLOCKWISE)
-
-        if back_text:
-            raw_text = (raw_text + "\n---\n" + back_text).strip()
-
-    # Send to GPT-4o
+    # 2. Structured JSON parsing
     if raw_text:
         payload = json.dumps({
-            "model": "gpt-4o",
+            "model": card_model,
             "messages": [{"role": "user", "content": _build_prompt(raw_text)}],
-            "max_tokens": 1000,
+            "max_tokens": 650,
             "response_format": {"type": "json_object"}
         }).encode("utf-8")
 
         try:
-            req = requests.post(
+            req = session.post(
                 "https://api.openai.com/v1/chat/completions",
                 data=payload,
                 headers={
                     "Authorization": f"Bearer {openai_api_key}",
                     "Content-Type": "application/json"
                 },
-                timeout=35
+                timeout=25
             )
             if req.status_code != 200:
                 err_text = req.text
@@ -284,41 +279,39 @@ def extract_with_rotation(front_bgr, back_bgr, openai_api_key: str, vision_api_k
             send_openai_error_notification(err_msg)
             raise RuntimeError(err_msg)
     else:
-        # Direct OpenAI Vision fallback
+        # Direct OpenAI Vision fallback if Google Vision OCR yielded no text
         content = [
             {"type": "text", "text": _build_prompt("Card images uploaded")}
         ]
         if rotated_front is not None:
-            _, fb = cv2.imencode(".jpg", rotated_front, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            fb_b64 = base64.b64encode(fb).decode("utf-8")
+            fb_b64 = _prepare_b64_for_ocr(rotated_front)
             content.append({
                 "type": "image_url",
                 "image_url": {"url": f"data:image/jpeg;base64,{fb_b64}"}
             })
         if rotated_back is not None:
-            _, bb = cv2.imencode(".jpg", rotated_back, [cv2.IMWRITE_JPEG_QUALITY, 85])
-            bb_b64 = base64.b64encode(bb).decode("utf-8")
+            bb_b64 = _prepare_b64_for_ocr(rotated_back)
             content.append({
                 "type": "image_url",
                 "image_url": {"url": f"data:image/jpeg;base64,{bb_b64}"}
             })
 
         payload = json.dumps({
-            "model": "gpt-4o",
+            "model": card_model,
             "messages": [{"role": "user", "content": content}],
-            "max_tokens": 1000,
+            "max_tokens": 650,
             "response_format": {"type": "json_object"}
         }).encode("utf-8")
 
         try:
-            req = requests.post(
+            req = session.post(
                 "https://api.openai.com/v1/chat/completions",
                 data=payload,
                 headers={
                     "Authorization": f"Bearer {openai_api_key}",
                     "Content-Type": "application/json"
                 },
-                timeout=40
+                timeout=30
             )
             if req.status_code != 200:
                 err_text = req.text
@@ -338,7 +331,7 @@ def extract_with_rotation(front_bgr, back_bgr, openai_api_key: str, vision_api_k
             send_openai_error_notification(err_msg)
             raise RuntimeError(err_msg)
 
-    # Mask financial card numbers
+    # 3. Mask financial card numbers
     if result.get("card_type") in FINANCIAL_CARD_TYPES:
         result["card_number"] = _mask_card_number(result.get("card_number", ""))
         result["cvv"] = "***"

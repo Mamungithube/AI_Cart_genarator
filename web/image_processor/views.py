@@ -2,6 +2,7 @@ import os
 import cv2
 import base64
 import logging
+import concurrent.futures
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
@@ -62,9 +63,21 @@ class ProcessCardView(APIView):
             )
 
         try:
-            # 1. Crop cards from photo
-            front_bgr = crop_business_card(front_bytes) if front_bytes else None
-            back_bgr = crop_business_card(back_bytes) if back_bytes else None
+            # 1. Crop cards from photo (concurrent execution when both sides are provided)
+            if front_bytes and back_bytes:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                    f_future = executor.submit(crop_business_card, front_bytes)
+                    b_future = executor.submit(crop_business_card, back_bytes)
+                    front_bgr = f_future.result()
+                    back_bgr = b_future.result()
+            elif front_bytes:
+                front_bgr = crop_business_card(front_bytes)
+                back_bgr = None
+            elif back_bytes:
+                front_bgr = None
+                back_bgr = crop_business_card(back_bytes)
+            else:
+                front_bgr, back_bgr = None, None
 
             # 2. Extract structured details & rotate upright
             rotated_front, rotated_back, details = extract_with_rotation(
