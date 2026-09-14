@@ -56,7 +56,7 @@ YOUR TASK & CORE RULES:
      so consecutive cards are diverse not only in color and pattern, but fundamentally distinct in structural composition!
 
 1. CRITICAL RULE: DESIGN STABILITY ON TEXT EDITS & "DONT CHANGE DESIGN" REQUESTS:
-   - When a user says "dont change my design", "keep this design", "same design", "without changing design", "ডিজাইন পরিবর্তন করো না", or simply updates/adds text fields (e.g. "change name to Dodul ch.", "add phone 012555555555", "change designation", "add email", "add my company name ..."):
+   - When a user says "dont change my design", "keep this design", "same design", "without changing design" or simply updates/adds text fields (e.g. "change name to Dodul ch.", "add phone 012555555555", "change designation", "add email", "add my company name ..."):
      * YOU MUST PRESERVE the existing "layout_style", "theme", AND "composition_variant" EXACTLY as they are in "current_card_state"!
      * NEVER change the visual layout style, colors, or structural composition when the user asks not to change the design or when only text/contact info is updated!
      * Compute "monogram" automatically from the initials of the new name if the name changed (e.g. "Dodul ch." -> "DO").
@@ -654,32 +654,18 @@ def process_card_agent_turn(session_id: str | None, user_message: str, request=N
     # 4. Deterministic State Preservation, Explicit Redesign, and Rollback
     explicit_style = detect_style_intent(user_message)
     explicit_composition = detect_composition_intent(user_message)
-    is_preserve_design = detect_preserve_design_intent(user_message)
-    is_redesign = detect_redesign_intent(user_message) and not is_preserve_design
-    is_rollback = detect_rollback_intent(user_message) and not is_preserve_design
-    is_color_intent = detect_color_intent(user_message) and not is_preserve_design
+    is_redesign = detect_redesign_intent(user_message)
+    is_rollback = detect_rollback_intent(user_message)
+    is_color_intent = detect_color_intent(user_message)
 
     logger.info(
         f"Session {session.id} v{version} intent analysis: "
-        f"is_new_session={is_new_session}, is_preserve_design={is_preserve_design}, "
-        f"explicit_style={explicit_style}, explicit_composition={explicit_composition}, "
+        f"is_new_session={is_new_session}, explicit_style={explicit_style}, "
+        f"explicit_composition={explicit_composition}, "
         f"is_redesign={is_redesign}, is_color_intent={is_color_intent}, is_rollback={is_rollback}"
     )
 
-    if is_preserve_design and not is_new_session:
-        # EXPLICIT PRESERVE: User specifically commanded "dont change my design", "keep this design", etc.
-        logger.info(
-            f"Session {session.id} v{version}: Explicit PRESERVE DESIGN intent detected. "
-            f"Strictly locking layout_style '{current_state.get('layout_style')}', "
-            f"composition '{current_state.get('composition_variant')}', and theme."
-        )
-        if current_state.get('layout_style'):
-            updated_state['layout_style'] = current_state['layout_style']
-        if current_state.get('composition_variant'):
-            updated_state['composition_variant'] = current_state['composition_variant']
-        if current_state.get('theme'):
-            updated_state['theme'] = current_state['theme']
-    elif is_rollback and not is_new_session:
+    if is_rollback and not is_new_session:
         # Rollback intent detected in ongoing session
         if explicit_style:
             updated_state['layout_style'] = explicit_style
