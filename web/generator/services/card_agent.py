@@ -512,20 +512,23 @@ def detect_redesign_intent(text: str) -> bool:
     if any(k in t for k in bengali_redesign_keywords):
         return True
 
-    # 1. Explicit redesign phrases (with negative lookbehind so "don't change design" won't match)
+    # 1. Explicit redesign phrases (ensuring not preceded by negation like "don't", "never", "without")
     redesign_patterns = [
         r'\bredesign\b',
         r'\bdifferent\s+(?:design|template|layout|style|look)\b',
         r'\b(?:new|fresh)\s+(?:look|design|template|layout|style)\b',
-        r'(?<!\bdon\'t\s)(?<!\bdont\s)(?<!\bdo\s+not\s)(?<!\bnever\s)(?<!\bwithout\s)\bchange\s+(?:the\s+|my\s+|this\s+)?(?:design|template|layout|style)(?:\s+completely)?\b',
+        r'\bchange\s+(?:the\s+|my\s+|this\s+)?(?:design|template|layout|style)(?:\s+completely)?\b',
         r'\bswitch\s+(?:the\s+)?(?:design|template|layout|style)\b',
-        r'(?<!\bdon\'t\s)(?<!\bdont\s)(?<!\bdo\s+not\s)\bchange\s+(?:it\s+)?(?:completely|totally|entirely)\b',
+        r'\bchange\s+(?:it\s+)?(?:completely|totally|entirely)\b',
         r'\bmake\s+it\s+look\s+different\b',
         r'\bsame\s+(?:design|template|layout)\s+(?:again|always|every\s+time|over\s+and\s+over)\b',
     ]
     for pat in redesign_patterns:
-        if re.search(pat, t):
-            return True
+        m = re.search(pat, t)
+        if m:
+            prefix = t[:m.start()]
+            if not re.search(r'\b(?:don\'?t|do\s+not|never|without|no)\s*$', prefix):
+                return True
 
     # 2. Negative feedback / dissatisfaction phrases
     dissatisfaction_patterns = [
