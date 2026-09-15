@@ -165,6 +165,8 @@ def crop_business_card(image_input, crop_margin=0.015, target_max_dim=1200):
         scaled_pil = pil_img.resize((scaled_w, scaled_h), Image.Resampling.BILINEAR)
     else:
         scale = 1.0
+        scaled_w = orig_w
+        scaled_h = orig_h
         scaled_bgr = orig_bgr
         scaled_pil = pil_img
 
