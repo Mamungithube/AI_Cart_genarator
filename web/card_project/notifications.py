@@ -1,6 +1,7 @@
 import json
 import logging
 import threading
+import time
 import urllib.error
 import requests
 from django.conf import settings
@@ -9,6 +10,11 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_NOTIFICATION_URL = "https://server.milo22.cloud/api/notifications/openai-notification"
 DEFAULT_NOTIFICATION_API_KEY = "notification_ai_9a7d3e5f1b2c4d8e0f6a5b4c3d2e1f0a"
+
+# Throttling to prevent flood spamming email/inbox on repeated failures
+_RECENT_ERRORS = {}
+_COOLDOWN_SECONDS = 300  # 5 minutes per unique error
+_NOTIFICATION_LOCK = threading.Lock()
 
 
 def get_notification_config() -> tuple[str, str]:
@@ -132,9 +138,10 @@ def _send_payload(url: str, api_key: str, message: str) -> bool:
         return False
 
 
-def send_openai_error_notification(error_message, async_send: bool = True):
+def send_openai_error_notification(error_message, async_send: bool = True, force: bool = False):
     """
-    Triggers an immediate error notification to the Milo22 webhook:
+    Triggers an error notification to the Milo22 webhook with cooldown throttling
+    to prevent spamming:
     POST https://server.milo22.cloud/api/notifications/openai-notification
     Headers:
       X-API-KEY: notification_ai_9a7d3e5f1b2c4d8e0f6a5b4c3d2e1f0a
@@ -145,10 +152,22 @@ def send_openai_error_notification(error_message, async_send: bool = True):
       error_message: str, dict, or Exception representing the OpenAI error.
       async_send: bool, defaults to True. When True, executes in a background thread
                   to prevent any latency or webhook failure from impacting the user request.
+      force: bool, bypasses the 5-minute cooldown.
     """
     clean_message = parse_openai_error_message(error_message)
     if not clean_message or not clean_message.strip():
         clean_message = "An unspecified error occurred with OpenAI service."
+
+    now = time.time()
+    if not force:
+        with _NOTIFICATION_LOCK:
+            last_sent = _RECENT_ERRORS.get(clean_message, 0)
+            if now - last_sent < _COOLDOWN_SECONDS:
+                logger.info(
+                    f"OpenAI notification throttled ({int(_COOLDOWN_SECONDS - (now - last_sent))}s remaining): {clean_message[:60]}"
+                )
+                return None
+            _RECENT_ERRORS[clean_message] = now
 
     url, api_key = get_notification_config()
 
@@ -163,3 +182,4 @@ def send_openai_error_notification(error_message, async_send: bool = True):
         return t
     else:
         return _send_payload(url, api_key, clean_message)
+

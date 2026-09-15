@@ -1,8 +1,13 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Automatically load environment variables from .env (both local web/ and project root)
+load_dotenv(BASE_DIR / '.env')
+load_dotenv(BASE_DIR.parent / '.env')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
@@ -174,3 +179,5 @@ OPENAI_NOTIFICATION_API_KEY = os.environ.get(
     'OPENAI_NOTIFICATION_API_KEY',
     'notification_ai_9a7d3e5f1b2c4d8e0f6a5b4c3d2e1f0a'
 )
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '').strip()
+
