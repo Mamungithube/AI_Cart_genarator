@@ -122,6 +122,7 @@ The back side must share the exact same aesthetic DNA, color scheme, and graphic
 2. NO decorative shape or SVG may ever cover, clip, or collide with any text.
 3. NO hardcoded placeholder or dummy text ("YOUR NAME", "GRAPHIC DESIGNER", "123 Dummy Street", "Lorem Ipsum").
 4. NO low contrast text (e.g. dark text on dark background, or light text on light shapes).
+5. NO QR CODES OR BARCODES: Even if the user's reference card image contains a QR code, barcode, or scan box, DO NOT include any QR code or barcode in the generated HTML or CSS. Completely omit all QR codes from the design.
 
 ### OUTPUT FORMAT:
 You MUST output ONLY valid JSON matching this schema:
@@ -468,7 +469,8 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
             f"   - Phone: {active_user_data.get('phone')}\n"
             f"   - Email: {active_user_data.get('email')}\n"
             f"   - Website: {active_user_data.get('website')}\n"
-            f"   - Address: {active_user_data.get('address')}"
+            f"   - Address: {active_user_data.get('address')}\n"
+            "5. NO QR CODES (STRICT): Even if the reference card image contains a QR code or barcode, IGNORE IT COMPLETELY. Do NOT include any QR code, QR box, or barcode on the output card."
         )
 
 
