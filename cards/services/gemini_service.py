@@ -386,11 +386,8 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
     """
     ai_config = get_active_ai_config()
     api_key = ai_config.get("api_key")
-    if not user_prompt or not str(user_prompt).strip():
-        if image_path:
-            user_prompt = "Generate an executive visiting card replicating the design, visual style, and colors of the attached reference card image."
-        else:
-            user_prompt = "Generate a luxury, executive corporate business card."
+    provider = ai_config.get("provider", "gemini")
+    user_prompt = str(user_prompt or "").strip()
 
     # Check if user explicitly asked to create/make a new card
     if is_new_card_intent(user_prompt):
@@ -429,10 +426,12 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
         task_instructions.append(f"PREVIOUS FRONT HTML:\n{previous_card.get('front_html', '')}")
         task_instructions.append(f"PREVIOUS BACK HTML:\n{previous_card.get('back_html', '')}")
         task_instructions.append(f"PREVIOUS CSS:\n{previous_card.get('css', '')}")
-        task_instructions.append(f"USER FEEDBACK / REDESIGN INSTRUCTIONS:\n{user_prompt}")
+        if user_prompt:
+            task_instructions.append(f"USER FEEDBACK / REDESIGN INSTRUCTIONS:\n{user_prompt}")
     else:
         task_instructions.append("THIS IS A NEW BUSINESS CARD REQUEST.")
-        task_instructions.append(f"USER PROMPT:\n{user_prompt}")
+        if user_prompt:
+            task_instructions.append(f"USER PROMPT:\n{user_prompt}")
 
     # Explicitly require rendering the actual user data
     user_specs = []
@@ -455,9 +454,13 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
         task_instructions.append(
             "🚨 MANDATORY USER CONTACT DATA TO RENDER IN THE DESIGN (USE ONLY THESE DETAILS, DO NOT INVENT NAMES):\n" + "\n".join(user_specs)
         )
-    else:
+    elif user_prompt:
         task_instructions.append(
             "CRITICAL: Carefully parse and extract the person's exact Name, Job Title, Company Name, and Contact details directly from the user's prompt text above. DO NOT use placeholder names."
+        )
+    elif image_path:
+        task_instructions.append(
+            "CRITICAL: Extract and render the person's exact Name, Job Title, Company Name, and Contact details directly from the attached reference image. DO NOT use placeholder names."
         )
 
 
@@ -475,16 +478,27 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
             "   - All text and contact elements MUST be inside foreground containers with `position: relative; z-index: 5;`.\n"
             "   - Ensure text has clean contrast and generous padding so no background artwork ever covers or clips any letters.\n"
             "3. MATCHING BACK-SIDE CREATION:\n"
-            "   - Generate a companion back side that echoes the exact visual motif, palette, and design language of the front side.\n"
-            "4. RENDER REAL USER DATA (NO DUMMY TEXT):\n"
-            f"   - Full Name: {active_user_data.get('name')}\n"
-            f"   - Job Title: {active_user_data.get('title')}\n"
-            f"   - Company: {active_user_data.get('company')}\n"
-            f"   - Phone: {active_user_data.get('phone')}\n"
-            f"   - Email: {active_user_data.get('email')}\n"
-            f"   - Website: {active_user_data.get('website')}\n"
-            f"   - Address: {active_user_data.get('address')}"
-            "\n5. STRICTLY NO QR CODES: If the reference card image contains a QR code, barcode, or scan box, IGNORE IT COMPLETELY. Do NOT include any QR code, scan box, or barcode on the card."
+            "   - Generate a companion back side that echoes the exact visual motif, palette, and design language of the front side."
+        )
+        if any(active_user_data.values()):
+            task_instructions.append(
+                "4. RENDER REAL USER DATA (NO DUMMY TEXT):\n"
+                f"   - Full Name: {active_user_data.get('name')}\n"
+                f"   - Job Title: {active_user_data.get('title')}\n"
+                f"   - Company: {active_user_data.get('company')}\n"
+                f"   - Phone: {active_user_data.get('phone')}\n"
+                f"   - Email: {active_user_data.get('email')}\n"
+                f"   - Website: {active_user_data.get('website')}\n"
+                f"   - Address: {active_user_data.get('address')}"
+            )
+        else:
+            task_instructions.append(
+                "4. EXTRACT & RENDER REAL DATA DIRECTLY FROM THE REFERENCE IMAGE:\n"
+                "   - Extract the cardholder's Name, Designation, Company, Phone, Email, Website, and Address visible on the reference card image.\n"
+                "   - Never use placeholder names like 'John Doe' or 'Graphic Designer'."
+            )
+        task_instructions.append(
+            "5. STRICTLY NO QR CODES: If the reference card image contains a QR code, barcode, or scan box, IGNORE IT COMPLETELY. Do NOT include any QR code, scan box, or barcode on the card."
         )
 
 

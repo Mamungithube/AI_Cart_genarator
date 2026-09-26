@@ -218,10 +218,6 @@ class CardChatAPIView(APIView):
                 except Exception as e:
                     logger.warning(f"Could not parse base64 reference image: {e}")
 
-        # If user attached an image but did not provide text prompt, provide a high-quality default prompt
-        if not prompt and reference_image_file:
-            prompt = "Generate an executive visiting card matching the design, layout, and visual style of the attached reference image."
-
         return prompt, session_id_str, reference_image_file
 
     def post(self, request, *args, **kwargs):
@@ -231,9 +227,9 @@ class CardChatAPIView(APIView):
             return Response(
                 {
                     "status": "error",
-                    "message": "Prompt is required",
+                    "message": "Prompt or reference image is required",
                     "error": "Please provide 'message', 'prompt', or a reference image.",
-                    "errors": ["Prompt is required"]
+                    "errors": ["Prompt or reference image is required"]
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -418,9 +414,9 @@ class CardSessionHistoryAPIView(APIView):
             return Response(
                 {
                     "status": "error",
-                    "message": "Prompt is required",
+                    "message": "Prompt or reference image is required",
                     "error": "Please provide 'message', 'prompt', or a reference image.",
-                    "errors": ["Prompt is required"]
+                    "errors": ["Prompt or reference image is required"]
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
