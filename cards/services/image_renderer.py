@@ -99,7 +99,7 @@ def render_reference_card_composite(reference_image, card_data):
     """
     Composites user card credentials onto the reference image artwork.
     1. Crops/resizes reference image to 1050x600.
-    2. Identifies background color and inpaint-washes old dummy text.
+    2. Identifies background color from multiple patches and cleans old dummy text.
     3. Overlays user's actual name, designation, company, and contact details
        using matching contrast and fonts.
     """
@@ -111,7 +111,10 @@ def render_reference_card_composite(reference_image, card_data):
         if isinstance(reference_image, Image.Image):
             ref_pil = reference_image
         elif hasattr(reference_image, 'read'):
-            reference_image.seek(0)
+            try:
+                reference_image.seek(0)
+            except Exception:
+                pass
             ref_pil = Image.open(reference_image)
         elif isinstance(reference_image, str):
             s = reference_image.strip()
@@ -125,40 +128,58 @@ def render_reference_card_composite(reference_image, card_data):
         if not ref_pil:
             return None
 
-        # Resize/crop to 1050x600
+        # Resize to standard 1050x600
         w, h = 1050, 600
         ref_resized = ref_pil.resize((w, h), Image.Resampling.LANCZOS)
         if ref_resized.mode != 'RGB':
             ref_resized = ref_resized.convert('RGB')
 
-        # Convert to OpenCV BGR
         bgr = cv2.cvtColor(np.array(ref_resized), cv2.COLOR_RGB2BGR)
 
-        # Sample background color in the text area (top-left margin)
-        sample_bg = bgr[30:90, 40:100]
-        bg_bgr = np.median(sample_bg.reshape(-1, 3), axis=0).astype(int)
+        # Multi-patch background sampling (corners and margins)
+        patches = [
+            bgr[20:70, 30:80],
+            bgr[h-80:h-30, 30:80],
+            bgr[20:70, 150:200],
+            bgr[h-80:h-30, 150:200],
+        ]
+        medians = [np.median(p.reshape(-1, 3), axis=0) for p in patches]
+        bg_bgr = np.median(medians, axis=0).astype(int)
         bg_gray = int(0.299 * bg_bgr[2] + 0.587 * bg_bgr[1] + 0.114 * bg_bgr[0])
         is_dark = bg_gray < 128
 
-        # Inpaint text zone (left 60% of card)
-        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-        diff = cv2.absdiff(gray, np.full_like(gray, bg_gray))
+        # Inpaint text zone safely (left 60% of card, keeping right-side artwork intact)
+        clean_bgr = None
+        try:
+            gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+            diff = cv2.absdiff(gray, np.full_like(gray, bg_gray))
 
-        text_zone_mask = np.zeros_like(gray)
-        cv2.rectangle(text_zone_mask, (35, 40), (int(w * 0.62), h - 40), 255, -1)
+            text_zone_mask = np.zeros_like(gray)
+            cv2.rectangle(text_zone_mask, (30, 30), (int(w * 0.62), h - 30), 255, -1)
 
-        _, text_mask = cv2.threshold(diff, 20, 255, cv2.THRESH_BINARY)
-        text_mask = cv2.bitwise_and(text_mask, text_zone_mask)
+            _, text_mask = cv2.threshold(diff, 18, 255, cv2.THRESH_BINARY)
+            text_mask = cv2.bitwise_and(text_mask, text_zone_mask)
 
-        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
-        text_mask = cv2.dilate(text_mask, kernel, iterations=2)
+            # Safety check: if mask is reasonable, perform inpaint
+            if cv2.countNonZero(text_mask) < (w * h * 0.40):
+                kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+                text_mask = cv2.dilate(text_mask, kernel, iterations=2)
+                clean_bgr = cv2.inpaint(bgr, text_mask, inpaintRadius=5, flags=cv2.INPAINT_TELEA)
+        except Exception:
+            clean_bgr = None
 
-        inpainted_bgr = cv2.inpaint(bgr, text_mask, inpaintRadius=5, flags=cv2.INPAINT_TELEA)
-        clean_img = Image.fromarray(cv2.cvtColor(inpainted_bgr, cv2.COLOR_BGR2RGB))
+        if clean_bgr is None:
+            # High-fidelity fallback: blend background color over text zone, preserving curves on right
+            clean_bgr = bgr.copy()
+            overlay = bgr.copy()
+            cv2.rectangle(overlay, (30, 30), (int(w * 0.60), h - 30), (int(bg_bgr[0]), int(bg_bgr[1]), int(bg_bgr[2])), -1)
+            cv2.addWeighted(overlay, 0.95, clean_bgr, 0.05, 0, clean_bgr)
+
+        clean_img = Image.fromarray(cv2.cvtColor(clean_bgr, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(clean_img)
 
         # Extract user credentials
-        name = str(card_data.get('name') or "").strip()
+        name = str(card_data.get('name') or "Executive Name").strip()
         title = str(card_data.get('designation') or card_data.get('title') or "").strip()
         company = str(card_data.get('company_name') or card_data.get('company') or "").strip()
         phone = str(card_data.get('phone') or "").strip()
@@ -166,12 +187,10 @@ def render_reference_card_composite(reference_image, card_data):
         website = str(card_data.get('website') or "").strip()
         address = str(card_data.get('address') or "").strip()
 
-        # Typography colors
+        # High-contrast readable typography
         text_rgb = (255, 255, 255) if is_dark else (15, 23, 42)
         muted_rgb = (160, 175, 195) if is_dark else (71, 85, 105)
-
-        # Accent color
-        accent_rgb = _hex_to_rgb(card_data.get('accent_color'), (0, 150, 255) if is_dark else (0, 110, 220))
+        accent_rgb = (0, 200, 255) if is_dark else (0, 102, 204)
 
         font_name = ImageFont.load_default(size=44)
         font_title = ImageFont.load_default(size=20)
@@ -186,9 +205,6 @@ def render_reference_card_composite(reference_image, card_data):
 
         if name:
             draw.text((60, y), name, fill=text_rgb, font=font_name)
-            y += 54
-        else:
-            draw.text((60, y), "CARDHOLDER", fill=text_rgb, font=font_name)
             y += 54
 
         if title:
@@ -251,15 +267,6 @@ def render_dynamic_canvas_image(card_data):
     img = Image.new('RGB', (width, height), color=bg_rgb)
     draw = ImageDraw.Draw(img)
 
-    # Decorative modern geometric angled accents
-    accent_dark = (
-        int(accent_rgb[0] * 0.25 + bg_rgb[0] * 0.75),
-        int(accent_rgb[1] * 0.25 + bg_rgb[1] * 0.75),
-        int(accent_rgb[2] * 0.25 + bg_rgb[2] * 0.75),
-    )
-    draw.polygon([(width - 320, 0), (width, 0), (width, height), (width - 160, height)], fill=accent_dark)
-    draw.line([(width - 320, 0), (width - 160, height)], fill=accent_rgb, width=3)
-
     # Hairline frame
     frame_color = (255, 255, 255, 25) if is_dark else (0, 0, 0, 25)
     draw.rounded_rectangle([16, 16, width - 16, height - 16], radius=16, outline=frame_color[:3], width=1)
@@ -269,7 +276,6 @@ def render_dynamic_canvas_image(card_data):
     font_company = ImageFont.load_default(size=24)
     font_tagline = ImageFont.load_default(size=14)
     font_contact = ImageFont.load_default(size=18)
-    font_badge = ImageFont.load_default(size=36)
 
     # Company Header
     if company:
@@ -298,14 +304,6 @@ def render_dynamic_canvas_image(card_data):
         draw.text((74, y_pos + 5), prefix, fill=accent_rgb, font=font_contact)
         draw.text((110, y_pos + 5), val, fill=text_rgb, font=font_contact)
         y_pos += 44
-
-    # Modern Brand Monogram on the right
-    initial = (company[:1] if company else (name[:1] if name else "V")).upper()
-    badge_x = width - 180
-    badge_y = 220
-    draw.rounded_rectangle([badge_x, badge_y, badge_x + 100, badge_y + 100], radius=20, fill=bg_rgb, outline=accent_rgb, width=2)
-    draw.text((badge_x + 36, badge_y + 26), initial, fill=accent_rgb, font=font_badge)
-
     buf = io.BytesIO()
     img.save(buf, format='PNG', quality=95)
     return buf.getvalue()

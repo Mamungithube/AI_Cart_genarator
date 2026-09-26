@@ -1,6 +1,9 @@
 import io
+import os
 import json
+import base64
 import logging
+import requests
 from django.http import HttpResponse, JsonResponse
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -128,7 +131,123 @@ class OpenAIKeyConfigAPIView(APIView):
             "message": "Database OpenAI key cleared. System reverted to environment default.",
             "is_configured": False
         }, status=status.HTTP_200_OK)
+def extract_reference_image_from_request(request):
+    """
+    Exhaustively scans request.FILES, request.data, request.POST, and request.body
+    for any image upload, base64 string, or image URL.
+    Returns: (BytesIO_or_None, base64_str_or_empty)
+    """
+    # 1. Any file uploaded via multipart
+    if hasattr(request, 'FILES') and request.FILES:
+        for key in ('reference_image', 'image', 'file', 'card_image', 'photo', 'attachment', 'media', 'ref_image'):
+            if key in request.FILES:
+                f = request.FILES[key]
+                f.seek(0)
+                b = f.read()
+                b64 = f"data:image/jpeg;base64,{base64.b64encode(b).decode('utf-8')}"
+                return io.BytesIO(b), b64
+        first_file = next(iter(request.FILES.values()), None)
+        if first_file:
+            first_file.seek(0)
+            b = first_file.read()
+            b64 = f"data:image/jpeg;base64,{base64.b64encode(b).decode('utf-8')}"
+            return io.BytesIO(b), b64
 
+    def _parse_raw_image_val(val):
+        if not val or not isinstance(val, str):
+            return None, ""
+        val = val.strip()
+        if val.startswith('data:image') or (len(val) > 100 and not val.startswith(('http://', 'https://', '{', '['))):
+            try:
+                b64_part = val.split(',', 1)[1] if ',' in val else val
+                img_bytes = base64.b64decode(b64_part)
+                clean_b64 = f"data:image/jpeg;base64,{base64.b64encode(img_bytes).decode('utf-8')}"
+                return io.BytesIO(img_bytes), clean_b64
+            except Exception:
+                pass
+        elif val.startswith(('http://', 'https://')):
+            try:
+                resp = requests.get(val, timeout=6)
+                if resp.status_code == 200 and len(resp.content) > 100:
+                    clean_b64 = f"data:image/jpeg;base64,{base64.b64encode(resp.content).decode('utf-8')}"
+                    return io.BytesIO(resp.content), clean_b64
+            except Exception:
+                pass
+        return None, ""
+
+    image_keys = (
+        'reference_image', 'image', 'card_image', 'file', 'photo',
+        'image_base64', 'image_url', 'reference_image_url', 'ref_image',
+        'attachment', 'media', 'picture'
+    )
+
+    # 2. Check request.data
+    if hasattr(request, 'data') and request.data:
+        nested = request.data.get('data')
+        if isinstance(nested, str):
+            try:
+                nested = json.loads(nested)
+            except Exception:
+                pass
+        if isinstance(nested, dict):
+            for k in image_keys:
+                if k in nested:
+                    bio, b64 = _parse_raw_image_val(nested[k])
+                    if bio:
+                        return bio, b64
+
+        for k in image_keys:
+            if k in request.data:
+                bio, b64 = _parse_raw_image_val(request.data[k])
+                if bio:
+                    return bio, b64
+
+    # 3. Check request.POST
+    if hasattr(request, 'POST') and request.POST:
+        nested = request.POST.get('data')
+        if isinstance(nested, str):
+            try:
+                nested = json.loads(nested)
+            except Exception:
+                pass
+        if isinstance(nested, dict):
+            for k in image_keys:
+                if k in nested:
+                    bio, b64 = _parse_raw_image_val(nested[k])
+                    if bio:
+                        return bio, b64
+        for k in image_keys:
+            if k in request.POST:
+                bio, b64 = _parse_raw_image_val(request.POST[k])
+                if bio:
+                    return bio, b64
+
+    # 4. Check request.body JSON
+    if hasattr(request, 'body') and request.body:
+        try:
+            b_json = json.loads(request.body.decode('utf-8'))
+            if isinstance(b_json, dict):
+                nested = b_json.get('data')
+                if isinstance(nested, str):
+                    try:
+                        nested = json.loads(nested)
+                    except Exception:
+                        pass
+                if isinstance(nested, dict):
+                    for k in image_keys:
+                        if k in nested:
+                            bio, b64 = _parse_raw_image_val(nested[k])
+                            if bio:
+                                return bio, b64
+                for k in image_keys:
+                    if k in b_json:
+                        bio, b64 = _parse_raw_image_val(b_json[k])
+                        if bio:
+                            return bio, b64
+        except Exception:
+            pass
+
+    return None, ""
 
 
 class CardChatAPIView(APIView):
@@ -252,74 +371,11 @@ class CardChatAPIView(APIView):
 
         prompt = str(prompt).strip()
 
-        # 1. Check multipart/form-data files under all common key names
-        reference_image_file = None
-        if hasattr(request, 'FILES') and request.FILES:
-            reference_image_file = (
-                request.FILES.get('reference_image') or
-                request.FILES.get('image') or
-                request.FILES.get('file') or
-                request.FILES.get('card_image') or
-                request.FILES.get('photo') or
-                next(iter(request.FILES.values()), None)
-            )
-
-        # 2. Check JSON data for Base64 image (either inside 'data' or at root)
-        if not reference_image_file:
-            raw_b64 = None
-            if hasattr(request, 'data') and request.data:
-                nested = request.data.get('data')
-                if isinstance(nested, dict):
-                    raw_b64 = (
-                        nested.get('reference_image') or
-                        nested.get('image') or
-                        nested.get('card_image') or
-                        nested.get('file')
-                    )
-                if not raw_b64:
-                    raw_b64 = (
-                        request.data.get('reference_image') or
-                        request.data.get('image') or
-                        request.data.get('card_image') or
-                        request.data.get('file')
-                    )
-
-            if not raw_b64 and request.body:
-                try:
-                    b_data = json.loads(request.body.decode('utf-8'))
-                    nested = b_data.get('data')
-                    if isinstance(nested, dict):
-                        raw_b64 = (
-                            nested.get('reference_image') or
-                            nested.get('image') or
-                            nested.get('card_image') or
-                            nested.get('file')
-                        )
-                    if not raw_b64:
-                        raw_b64 = (
-                            b_data.get('reference_image') or
-                            b_data.get('image') or
-                            b_data.get('card_image') or
-                            b_data.get('file')
-                        )
-                except Exception:
-                    pass
-
-            if raw_b64 and isinstance(raw_b64, str):
-                raw_b64 = raw_b64.strip()
-                if raw_b64.startswith('data:image') or len(raw_b64) > 100:
-                    try:
-                        import base64
-                        if ',' in raw_b64:
-                            raw_b64 = raw_b64.split(',', 1)[1]
-                        img_bytes = base64.b64decode(raw_b64)
-                        reference_image_file = io.BytesIO(img_bytes)
-                    except Exception as e:
-                        logger.warning(f"Could not parse base64 reference image: {e}")
+        reference_image_file, ref_b64 = extract_reference_image_from_request(request)
 
         if not prompt and not reference_image_file:
             return Response(
-                {"status": "error", "error": "Please provide 'message' or a reference image."},
+                {"status": "error", "message": "Please provide 'message' or a reference image.", "errors": ["Prompt is required"]},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -327,10 +383,11 @@ class CardChatAPIView(APIView):
             request,
             prompt=prompt,
             session_id_str=session_id_str,
-            reference_image_file=reference_image_file
+            reference_image_file=reference_image_file,
+            ref_b64=ref_b64
         )
 
-    def _handle_card_turn(self, request, prompt, session_id_str=None, reference_image_file=None):
+    def _handle_card_turn(self, request, prompt, session_id_str=None, reference_image_file=None, ref_b64=""):
         # Retrieve or initialize session
         session = None
         if session_id_str:
@@ -358,12 +415,29 @@ class CardChatAPIView(APIView):
             except Exception as e:
                 logger.warning(f"Could not open in-memory reference image: {e}")
 
-        # Save user message without saving any image to disk
+        # If no new image was uploaded in this turn, check if the session already has a reference image
+        if not in_memory_image and session:
+            prev_msg = session.messages.filter(sender='user').exclude(reference_image="").order_by('-created_at').first()
+            if prev_msg and prev_msg.reference_image:
+                try:
+                    ref_b64 = prev_msg.reference_image
+                    raw = ref_b64.split(',', 1)[1] if ',' in ref_b64 else ref_b64
+                    img_bytes = base64.b64decode(raw)
+                    img = Image.open(io.BytesIO(img_bytes))
+                    img.load()
+                    if img.mode not in ('RGB', 'L'):
+                        img = img.convert('RGB')
+                    in_memory_image = img
+                    logger.info("Restored reference image from previous turn in session.")
+                except Exception as e:
+                    logger.warning(f"Could not restore session reference image: {e}")
+
+        # Save user message with reference image base64 if present
         CardMessage.objects.create(
             session=session,
             sender='user',
             message=prompt,
-            reference_image="",  # NO DISK IMAGE STORAGE
+            reference_image=ref_b64 or "",
             version=session.version
         )
 
@@ -576,72 +650,12 @@ class CardSessionHistoryAPIView(APIView):
                 ""
             )
             
-        reference_image_file = None
-        if hasattr(request, 'FILES') and request.FILES:
-            reference_image_file = (
-                request.FILES.get('reference_image') or
-                request.FILES.get('image') or
-                request.FILES.get('file') or
-                request.FILES.get('card_image') or
-                request.FILES.get('photo') or
-                next(iter(request.FILES.values()), None)
-            )
-
-        if not reference_image_file:
-            raw_b64 = None
-            if hasattr(request, 'data') and request.data:
-                nested = request.data.get('data')
-                if isinstance(nested, dict):
-                    raw_b64 = (
-                        nested.get('reference_image') or
-                        nested.get('image') or
-                        nested.get('card_image') or
-                        nested.get('file')
-                    )
-                if not raw_b64:
-                    raw_b64 = (
-                        request.data.get('reference_image') or
-                        request.data.get('image') or
-                        request.data.get('card_image') or
-                        request.data.get('file')
-                    )
-
-            if not raw_b64 and request.body:
-                try:
-                    b_data = json.loads(request.body.decode('utf-8'))
-                    nested = b_data.get('data')
-                    if isinstance(nested, dict):
-                        raw_b64 = (
-                            nested.get('reference_image') or
-                            nested.get('image') or
-                            nested.get('card_image') or
-                            nested.get('file')
-                        )
-                    if not raw_b64:
-                        raw_b64 = (
-                            b_data.get('reference_image') or
-                            b_data.get('image') or
-                            b_data.get('card_image') or
-                            b_data.get('file')
-                        )
-                except Exception:
-                    pass
-
-            if raw_b64 and isinstance(raw_b64, str):
-                raw_b64 = raw_b64.strip()
-                if raw_b64.startswith('data:image') or len(raw_b64) > 100:
-                    try:
-                        import base64
-                        if ',' in raw_b64:
-                            raw_b64 = raw_b64.split(',', 1)[1]
-                        img_bytes = base64.b64decode(raw_b64)
-                        reference_image_file = io.BytesIO(img_bytes)
-                    except Exception as e:
-                        logger.warning(f"Could not parse base64 reference image: {e}")
+        reference_image_file, ref_b64 = extract_reference_image_from_request(request)
 
         return chat_view._handle_card_turn(
             request,
             prompt=str(prompt).strip(),
             session_id_str=str(session_id),
-            reference_image_file=reference_image_file
+            reference_image_file=reference_image_file,
+            ref_b64=ref_b64
         )
