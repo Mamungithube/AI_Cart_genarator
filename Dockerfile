@@ -21,19 +21,14 @@ COPY requirements.txt /app/
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && \
-    mkdir -p /app/staticfiles /app/media && \
-    chown -R appuser:appuser /app
-
 # Copy application files
-COPY --chown=appuser:appuser . /app/
+COPY . /app/
 
-# Switch to non-root user
-USER appuser
+# Ensure static & media directories exist
+RUN mkdir -p /app/staticfiles /app/media
 
 # Container Healthcheck
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:8000/api/health/ || exit 1
 
 EXPOSE 8000
