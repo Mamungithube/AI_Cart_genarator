@@ -324,6 +324,27 @@ TEMPLATES = [
     <h1 class="back-brand-title">{company}</h1>
     <div class="back-brand-subtitle">{tagline}</div>
     
+    <div class="back-qr-box">
+      <svg viewBox="0 0 100 100" fill="#070a11">
+        <rect x="5" y="5" width="25" height="25" fill="#070a11" />
+        <rect x="10" y="10" width="15" height="15" fill="#ffffff" />
+        <rect x="14" y="14" width="7" height="7" fill="#070a11" />
+        <rect x="70" y="5" width="25" height="25" fill="#070a11" />
+        <rect x="75" y="10" width="15" height="15" fill="#ffffff" />
+        <rect x="79" y="14" width="7" height="7" fill="#070a11" />
+        <rect x="5" y="70" width="25" height="25" fill="#070a11" />
+        <rect x="10" y="75" width="15" height="15" fill="#ffffff" />
+        <rect x="14" y="79" width="7" height="7" fill="#070a11" />
+        <rect x="36" y="8" width="6" height="6" fill="#070a11"/>
+        <rect x="46" y="14" width="8" height="8" fill="#070a11"/>
+        <rect x="36" y="24" width="10" height="6" fill="#070a11"/>
+        <rect x="40" y="40" width="20" height="20" fill="#070a11"/>
+        <rect x="68" y="44" width="8" height="12" fill="#070a11"/>
+        <rect x="70" y="72" width="18" height="18" fill="#070a11"/>
+      </svg>
+    </div>
+    <div class="back-qr-label">SCAN TO CONNECT</div>
+    
     <div class="back-website-pill">{website}</div>
   </div>
 </div>
@@ -643,6 +664,27 @@ TEMPLATES = [
     <h1 class="cyber-back-title">{company}</h1>
     <div class="cyber-back-subtitle">{tagline}</div>
     
+    <div class="cyber-back-qr">
+      <svg viewBox="0 0 100 100" fill="#060b19">
+        <rect x="5" y="5" width="25" height="25" fill="#060b19" />
+        <rect x="10" y="10" width="15" height="15" fill="#ffffff" />
+        <rect x="14" y="14" width="7" height="7" fill="#060b19" />
+        <rect x="70" y="5" width="25" height="25" fill="#060b19" />
+        <rect x="75" y="10" width="15" height="15" fill="#ffffff" />
+        <rect x="79" y="14" width="7" height="7" fill="#060b19" />
+        <rect x="5" y="70" width="25" height="25" fill="#060b19" />
+        <rect x="10" y="75" width="15" height="15" fill="#ffffff" />
+        <rect x="14" y="79" width="7" height="7" fill="#060b19" />
+        <rect x="36" y="8" width="6" height="6" fill="#060b19"/>
+        <rect x="46" y="14" width="8" height="8" fill="#060b19"/>
+        <rect x="36" y="24" width="10" height="6" fill="#060b19"/>
+        <rect x="40" y="40" width="20" height="20" fill="#060b19"/>
+        <rect x="68" y="44" width="8" height="12" fill="#060b19"/>
+        <rect x="70" y="72" width="18" height="18" fill="#060b19"/>
+      </svg>
+    </div>
+    <div class="cyber-back-tag">SCAN TO CONNECT</div>
+    
     <div class="cyber-website-pill">{website}</div>
   </div>
 </div>
@@ -938,6 +980,27 @@ TEMPLATES = [
     <div class="swiss-back-logo">{initial}</div>
     <h1 class="swiss-back-title">{company}</h1>
     <div class="swiss-back-subtitle">{tagline}</div>
+    
+    <div class="swiss-back-qr">
+      <svg viewBox="0 0 100 100" fill="#0f172a">
+        <rect x="5" y="5" width="25" height="25" fill="#0f172a" />
+        <rect x="10" y="10" width="15" height="15" fill="#ffffff" />
+        <rect x="14" y="14" width="7" height="7" fill="#0f172a" />
+        <rect x="70" y="5" width="25" height="25" fill="#0f172a" />
+        <rect x="75" y="10" width="15" height="15" fill="#ffffff" />
+        <rect x="79" y="14" width="7" height="7" fill="#0f172a" />
+        <rect x="5" y="70" width="25" height="25" fill="#0f172a" />
+        <rect x="10" y="75" width="15" height="15" fill="#ffffff" />
+        <rect x="14" y="79" width="7" height="7" fill="#0f172a" />
+        <rect x="36" y="8" width="6" height="6" fill="#0f172a"/>
+        <rect x="46" y="14" width="8" height="8" fill="#0f172a"/>
+        <rect x="36" y="24" width="10" height="6" fill="#0f172a"/>
+        <rect x="40" y="40" width="20" height="20" fill="#0f172a"/>
+        <rect x="68" y="44" width="8" height="12" fill="#0f172a"/>
+        <rect x="70" y="72" width="18" height="18" fill="#0f172a"/>
+      </svg>
+    </div>
+    <div class="swiss-back-tag">SCAN TO CONNECT</div>
     
     <div class="swiss-website-pill">{website}</div>
   </div>
