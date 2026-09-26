@@ -170,51 +170,81 @@ class CardChatAPIView(APIView):
         session_id_str = None
 
         if hasattr(request, 'data') and request.data:
-            prompt = (
-                request.data.get('message') or
-                request.data.get('massage') or
-                request.data.get('prompt') or
-                ""
-            )
-            session_id_str = request.data.get('session_id')
             nested_data = request.data.get('data')
             if isinstance(nested_data, dict):
                 prompt = (
-                    prompt or
-                    nested_data.get('message') or
                     nested_data.get('massage') or
+                    nested_data.get('message') or
                     nested_data.get('prompt') or
                     ""
                 )
-                session_id_str = session_id_str or nested_data.get('session_id')
+                session_id_str = nested_data.get('session_id')
+            elif isinstance(nested_data, str):
+                try:
+                    parsed = json.loads(nested_data)
+                    if isinstance(parsed, dict):
+                        prompt = (
+                            parsed.get('massage') or
+                            parsed.get('message') or
+                            parsed.get('prompt') or
+                            ""
+                        )
+                        session_id_str = parsed.get('session_id')
+                except Exception:
+                    pass
+
+            if not prompt:
+                prompt = (
+                    request.data.get('massage') or
+                    request.data.get('message') or
+                    request.data.get('prompt') or
+                    ""
+                )
+            if not session_id_str:
+                session_id_str = request.data.get('session_id')
 
         if not prompt and request.body:
             try:
                 b_data = json.loads(request.body.decode('utf-8'))
-                prompt = (
-                    b_data.get('message') or
-                    b_data.get('massage') or
-                    b_data.get('prompt') or
-                    ""
-                )
-                session_id_str = session_id_str or b_data.get('session_id')
                 nested_data = b_data.get('data')
                 if isinstance(nested_data, dict):
                     prompt = (
-                        prompt or
-                        nested_data.get('message') or
                         nested_data.get('massage') or
+                        nested_data.get('message') or
                         nested_data.get('prompt') or
                         ""
                     )
                     session_id_str = session_id_str or nested_data.get('session_id')
+                elif isinstance(nested_data, str):
+                    try:
+                        parsed = json.loads(nested_data)
+                        if isinstance(parsed, dict):
+                            prompt = (
+                                parsed.get('massage') or
+                                parsed.get('message') or
+                                parsed.get('prompt') or
+                                ""
+                            )
+                            session_id_str = session_id_str or parsed.get('session_id')
+                    except Exception:
+                        pass
+
+                if not prompt:
+                    prompt = (
+                        b_data.get('massage') or
+                        b_data.get('message') or
+                        b_data.get('prompt') or
+                        ""
+                    )
+                if not session_id_str:
+                    session_id_str = session_id_str or b_data.get('session_id')
             except Exception:
                 pass
 
         if not prompt:
             prompt = (
-                request.POST.get('message') or
                 request.POST.get('massage') or
+                request.POST.get('message') or
                 request.POST.get('prompt') or
                 ""
             )
@@ -410,16 +440,18 @@ class CardSessionHistoryAPIView(APIView):
                 "created_at": m.created_at.isoformat()
             })
 
+        data_payload = {
+            "session_id": str(session.id),
+            "current_version": session.version,
+            "current_state": session.card_data,
+            "card_data": session.card_data,
+            "messages": messages_data,
+        }
+
         # EXACT response schema matching agent.md lines 101-109 (NO EXTRA KEYS)
         return Response({
             "session_id": str(session.id),
-            "data": {
-                "session_id": str(session.id),
-                "current_version": session.version,
-                "current_state": session.card_data,
-                "card_data": session.card_data,
-                "messages": messages_data,
-            },
+            "data": data_payload,
             "current_version": session.version,
             "current_state": session.card_data,
             "card_data": session.card_data,
@@ -432,12 +464,42 @@ class CardSessionHistoryAPIView(APIView):
         chat_view = CardChatAPIView()
         prompt = ""
         if hasattr(request, 'data') and request.data:
-            prompt = request.data.get('message') or request.data.get('massage') or request.data.get('prompt') or ""
             nested_data = request.data.get('data')
             if isinstance(nested_data, dict):
-                prompt = prompt or nested_data.get('message') or nested_data.get('massage') or nested_data.get('prompt') or ""
+                prompt = (
+                    nested_data.get('massage') or
+                    nested_data.get('message') or
+                    nested_data.get('prompt') or
+                    ""
+                )
+            elif isinstance(nested_data, str):
+                try:
+                    parsed = json.loads(nested_data)
+                    if isinstance(parsed, dict):
+                        prompt = (
+                            parsed.get('massage') or
+                            parsed.get('message') or
+                            parsed.get('prompt') or
+                            ""
+                        )
+                except Exception:
+                    pass
+
+            if not prompt:
+                prompt = (
+                    request.data.get('massage') or
+                    request.data.get('message') or
+                    request.data.get('prompt') or
+                    ""
+                )
+
         if not prompt and request.POST:
-            prompt = request.POST.get('message') or request.POST.get('massage') or request.POST.get('prompt') or ""
+            prompt = (
+                request.POST.get('massage') or
+                request.POST.get('message') or
+                request.POST.get('prompt') or
+                ""
+            )
             
         reference_image_file = request.FILES.get('reference_image')
         return chat_view._handle_card_turn(
