@@ -1,123 +1,336 @@
+import os
 import io
+import re
+import cv2
 import base64
+import logging
+import shutil
+import subprocess
+import tempfile
+import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-def render_business_card_image(card_data):
+logger = logging.getLogger(__name__)
+
+
+def _hex_to_rgb(hex_code, fallback=(9, 13, 22)):
+    if not hex_code:
+        return fallback
+    try:
+        h = str(hex_code).strip().lstrip('#')
+        if len(h) == 3:
+            h = ''.join([c * 2 for c in h])
+        if len(h) == 6:
+            return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    except Exception:
+        pass
+    return fallback
+
+
+def render_html_to_image(front_html, css):
     """
-    Renders an executive print-ready business card PNG image (1050x600 px)
-    from card_data and returns (png_bytes, base64_data_uri).
+    Renders front_html + css to PNG bytes (1050x600 px) using wkhtmltoimage if available.
+    """
+    if not front_html:
+        return None
+
+    wk = shutil.which("wkhtmltoimage")
+    if not wk:
+        # Check standard Linux paths
+        for p in ("/usr/bin/wkhtmltoimage", "/usr/local/bin/wkhtmltoimage"):
+            if os.path.exists(p):
+                wk = p
+                break
+    if not wk:
+        return None
+
+    full_html = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* {{ margin: 0; padding: 0; box-sizing: border-box; }}
+html, body {{ width: 1050px; height: 600px; overflow: hidden; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+{css or ''}
+</style>
+</head>
+<body>
+{front_html}
+</body>
+</html>"""
+
+    h_path = None
+    p_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8") as h_file:
+            h_file.write(full_html)
+            h_path = h_file.name
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as p_file:
+            p_path = p_file.name
+
+        cmd = [
+            wk,
+            "--width", "1050",
+            "--height", "600",
+            "--enable-local-file-access",
+            "--quality", "95",
+            h_path,
+            p_path
+        ]
+        ret = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=8)
+        if ret.returncode == 0 and os.path.exists(p_path) and os.path.getsize(p_path) > 1000:
+            with open(p_path, "rb") as f:
+                return f.read()
+    except Exception as e:
+        logger.warning(f"wkhtmltoimage rendering error: {e}")
+    finally:
+        for path in (h_path, p_path):
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception:
+                    pass
+
+    return None
+
+
+def render_reference_card_composite(reference_image, card_data):
+    """
+    Composites user card credentials onto the reference image artwork.
+    1. Crops/resizes reference image to 1050x600.
+    2. Identifies background color and inpaint-washes old dummy text.
+    3. Overlays user's actual name, designation, company, and contact details
+       using matching contrast and fonts.
+    """
+    if not reference_image:
+        return None
+
+    try:
+        ref_pil = None
+        if isinstance(reference_image, Image.Image):
+            ref_pil = reference_image
+        elif hasattr(reference_image, 'read'):
+            reference_image.seek(0)
+            ref_pil = Image.open(reference_image)
+        elif isinstance(reference_image, str):
+            s = reference_image.strip()
+            if s.startswith('data:image') or len(s) > 100:
+                b64_part = s.split(',', 1)[1] if ',' in s else s
+                img_bytes = base64.b64decode(b64_part)
+                ref_pil = Image.open(io.BytesIO(img_bytes))
+            elif os.path.exists(s):
+                ref_pil = Image.open(s)
+
+        if not ref_pil:
+            return None
+
+        # Resize/crop to 1050x600
+        w, h = 1050, 600
+        ref_resized = ref_pil.resize((w, h), Image.Resampling.LANCZOS)
+        if ref_resized.mode != 'RGB':
+            ref_resized = ref_resized.convert('RGB')
+
+        # Convert to OpenCV BGR
+        bgr = cv2.cvtColor(np.array(ref_resized), cv2.COLOR_RGB2BGR)
+
+        # Sample background color in the text area (top-left margin)
+        sample_bg = bgr[30:90, 40:100]
+        bg_bgr = np.median(sample_bg.reshape(-1, 3), axis=0).astype(int)
+        bg_gray = int(0.299 * bg_bgr[2] + 0.587 * bg_bgr[1] + 0.114 * bg_bgr[0])
+        is_dark = bg_gray < 128
+
+        # Inpaint text zone (left 60% of card)
+        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+        diff = cv2.absdiff(gray, np.full_like(gray, bg_gray))
+
+        text_zone_mask = np.zeros_like(gray)
+        cv2.rectangle(text_zone_mask, (35, 40), (int(w * 0.62), h - 40), 255, -1)
+
+        _, text_mask = cv2.threshold(diff, 20, 255, cv2.THRESH_BINARY)
+        text_mask = cv2.bitwise_and(text_mask, text_zone_mask)
+
+        kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (5, 5))
+        text_mask = cv2.dilate(text_mask, kernel, iterations=2)
+
+        inpainted_bgr = cv2.inpaint(bgr, text_mask, inpaintRadius=5, flags=cv2.INPAINT_TELEA)
+        clean_img = Image.fromarray(cv2.cvtColor(inpainted_bgr, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(clean_img)
+
+        # Extract user credentials
+        name = str(card_data.get('name') or "").strip()
+        title = str(card_data.get('designation') or card_data.get('title') or "").strip()
+        company = str(card_data.get('company_name') or card_data.get('company') or "").strip()
+        phone = str(card_data.get('phone') or "").strip()
+        email = str(card_data.get('email') or "").strip()
+        website = str(card_data.get('website') or "").strip()
+        address = str(card_data.get('address') or "").strip()
+
+        # Typography colors
+        text_rgb = (255, 255, 255) if is_dark else (15, 23, 42)
+        muted_rgb = (160, 175, 195) if is_dark else (71, 85, 105)
+
+        # Accent color
+        accent_rgb = _hex_to_rgb(card_data.get('accent_color'), (0, 150, 255) if is_dark else (0, 110, 220))
+
+        font_name = ImageFont.load_default(size=44)
+        font_title = ImageFont.load_default(size=20)
+        font_company = ImageFont.load_default(size=22)
+        font_contact = ImageFont.load_default(size=18)
+
+        # Render text block
+        y = 75
+        if company:
+            draw.text((60, y), company.upper(), fill=muted_rgb, font=font_company)
+            y += 34
+
+        if name:
+            draw.text((60, y), name, fill=text_rgb, font=font_name)
+            y += 54
+        else:
+            draw.text((60, y), "CARDHOLDER", fill=text_rgb, font=font_name)
+            y += 54
+
+        if title:
+            draw.text((62, y), title.upper(), fill=accent_rgb, font=font_title)
+            y += 30
+
+        # Sleek accent underline
+        draw.rounded_rectangle([62, y, 140, y + 4], radius=2, fill=accent_rgb)
+        y += 40
+
+        # Contact items
+        items = []
+        if phone: items.append(('M', phone))
+        if email: items.append(('E', email))
+        if website: items.append(('W', website))
+        if address: items.append(('A', address))
+
+        for tag, val in items[:4]:
+            draw.rounded_rectangle([62, y, 92, y + 26], radius=5, fill=accent_rgb)
+            draw.text((72, y + 4), tag, fill=(255, 255, 255), font=font_contact)
+            draw.text((106, y + 4), val, fill=text_rgb, font=font_contact)
+            y += 42
+
+        buf = io.BytesIO()
+        clean_img.save(buf, format='PNG', quality=95)
+        return buf.getvalue()
+
+    except Exception as e:
+        logger.warning(f"Error rendering reference card composite: {e}")
+        return None
+
+
+def render_dynamic_canvas_image(card_data):
+    """
+    Renders an executive, modern visiting card when no reference image or HTML tool is available.
+    Dynamically respects dark/light themes without rigid hardcoded placeholder labels.
     """
     width = 1050
     height = 600
 
     name = str(card_data.get('name') or "Executive Name")
-    title = str(card_data.get('title') or "Professional Title")
-    company = str(card_data.get('company') or "Company Name")
-    tagline = str(card_data.get('tagline') or "ARCHITECTING EXCELLENCE")
+    title = str(card_data.get('designation') or card_data.get('title') or "")
+    company = str(card_data.get('company_name') or card_data.get('company') or "")
+    tagline = str(card_data.get('tagline') or "")
     phone = str(card_data.get('phone') or "")
     email = str(card_data.get('email') or "")
     website = str(card_data.get('website') or "")
     address = str(card_data.get('address') or "")
 
-    primary_color = card_data.get('primary_color') or "#090d16"
-    accent_color = card_data.get('accent_color') or "#d4af37"
+    primary_hex = card_data.get('primary_color') or "#0d1117"
+    accent_hex = card_data.get('accent_color') or "#00f2fe"
 
-    # Normalize hex colors
-    def hex_to_rgb(hex_code, fallback=(9, 13, 22)):
-        try:
-            h = hex_code.lstrip('#')
-            if len(h) == 3:
-                h = ''.join([c*2 for c in h])
-            return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
-        except Exception:
-            return fallback
+    bg_rgb = _hex_to_rgb(primary_hex, (13, 17, 23))
+    accent_rgb = _hex_to_rgb(accent_hex, (0, 242, 254))
 
-    bg_rgb = hex_to_rgb(primary_color, (9, 13, 22))
-    accent_rgb = hex_to_rgb(accent_color, (212, 175, 55))
     is_dark = (bg_rgb[0] * 0.299 + bg_rgb[1] * 0.587 + bg_rgb[2] * 0.114) < 128
     text_rgb = (255, 255, 255) if is_dark else (15, 23, 42)
     muted_rgb = (148, 163, 184) if is_dark else (100, 116, 139)
 
-    # 1. Base image
     img = Image.new('RGB', (width, height), color=bg_rgb)
     draw = ImageDraw.Draw(img)
 
-    # 2. Subtle radial glow in top right
-    glow_color = (
-        int(accent_rgb[0] * 0.15 + bg_rgb[0] * 0.85),
-        int(accent_rgb[1] * 0.15 + bg_rgb[1] * 0.85),
-        int(accent_rgb[2] * 0.15 + bg_rgb[2] * 0.85),
+    # Decorative modern geometric angled accents
+    accent_dark = (
+        int(accent_rgb[0] * 0.25 + bg_rgb[0] * 0.75),
+        int(accent_rgb[1] * 0.25 + bg_rgb[1] * 0.75),
+        int(accent_rgb[2] * 0.25 + bg_rgb[2] * 0.75),
     )
-    for r in range(300, 0, -15):
-        draw.ellipse([width - 150 - r, -50 - r, width - 150 + r, -50 + r], fill=glow_color)
+    draw.polygon([(width - 320, 0), (width, 0), (width, height), (width - 160, height)], fill=accent_dark)
+    draw.line([(width - 320, 0), (width - 160, height)], fill=accent_rgb, width=3)
 
-    # 3. Inner border hairline
-    border_color = (255, 255, 255, 25) if is_dark else (0, 0, 0, 25)
-    draw.rounded_rectangle([12, 12, width - 12, height - 12], radius=16, outline=border_color[:3], width=1)
+    # Hairline frame
+    frame_color = (255, 255, 255, 25) if is_dark else (0, 0, 0, 25)
+    draw.rounded_rectangle([16, 16, width - 16, height - 16], radius=16, outline=frame_color[:3], width=1)
 
-    # 4. Fonts
-    font_name = ImageFont.load_default(size=40)
-    font_title = ImageFont.load_default(size=18)
+    font_name = ImageFont.load_default(size=44)
+    font_title = ImageFont.load_default(size=20)
     font_company = ImageFont.load_default(size=24)
     font_tagline = ImageFont.load_default(size=14)
-    font_contact = ImageFont.load_default(size=16)
-    font_emblem = ImageFont.load_default(size=26)
+    font_contact = ImageFont.load_default(size=18)
+    font_badge = ImageFont.load_default(size=36)
 
-    # 5. Top Header (Company & Logo)
-    initial = (company[:1] if company else "C").upper()
-    emblem_box = [60, 50, 116, 106]
-    draw.rounded_rectangle(emblem_box, radius=12, fill=accent_rgb)
-    draw.text((76, 62), initial, fill=bg_rgb, font=font_emblem)
+    # Company Header
+    if company:
+        draw.text((60, 60), company.upper(), fill=text_rgb, font=font_company)
+        if tagline:
+            draw.text((60, 92), tagline.upper(), fill=muted_rgb, font=font_tagline)
 
-    draw.text((130, 56), company.upper(), fill=text_rgb, font=font_company)
-    draw.text((130, 86), tagline.upper(), fill=muted_rgb, font=font_tagline)
+    # Name & Title
+    name_y = 170 if company else 120
+    draw.text((60, name_y), name, fill=text_rgb, font=font_name)
 
-    # 6. Main Info (Name & Title)
-    draw.text((60, 200), name, fill=text_rgb, font=font_name)
-    draw.text((62, 254), title.upper(), fill=accent_rgb, font=font_title)
+    if title:
+        draw.text((62, name_y + 54), title.upper(), fill=accent_rgb, font=font_title)
+        draw.rounded_rectangle([62, name_y + 86, 140, name_y + 90], radius=2, fill=accent_rgb)
 
-    # Accent bar
-    draw.rounded_rectangle([62, 286, 120, 290], radius=2, fill=accent_rgb)
-
-    # 7. Contact Details Stack
+    # Contact Info
     contact_items = []
     if phone: contact_items.append(('M', phone))
     if email: contact_items.append(('E', email))
     if website: contact_items.append(('W', website))
     if address: contact_items.append(('A', address))
 
-    # Fallback default items if none extracted
-    if not contact_items:
-        contact_items = [('M', '+880 1xxx'), ('E', 'contact@company.com')]
-
-    y_pos = 330
+    y_pos = name_y + 120
     for prefix, val in contact_items[:4]:
-        # Chip
-        draw.rounded_rectangle([62, y_pos, 96, y_pos + 30], radius=6, outline=accent_rgb, width=1)
-        draw.text((74, y_pos + 6), prefix, fill=accent_rgb, font=font_title)
-        draw.text((110, y_pos + 7), val, fill=text_rgb, font=font_contact)
-        y_pos += 46
+        draw.rounded_rectangle([62, y_pos, 96, y_pos + 28], radius=6, outline=accent_rgb, width=1)
+        draw.text((74, y_pos + 5), prefix, fill=accent_rgb, font=font_contact)
+        draw.text((110, y_pos + 5), val, fill=text_rgb, font=font_contact)
+        y_pos += 44
 
-    # 8. Clean Modern Brand Monogram Badge on the right side (Strictly No QR Code)
-    badge_x = width - 220
-    badge_y = 190
-    badge_size = 140
+    # Modern Brand Monogram on the right
+    initial = (company[:1] if company else (name[:1] if name else "V")).upper()
+    badge_x = width - 180
+    badge_y = 220
+    draw.rounded_rectangle([badge_x, badge_y, badge_x + 100, badge_y + 100], radius=20, fill=bg_rgb, outline=accent_rgb, width=2)
+    draw.text((badge_x + 36, badge_y + 26), initial, fill=accent_rgb, font=font_badge)
 
-    # Decorative backdrop emblem
-    draw.rounded_rectangle([badge_x, badge_y, badge_x + badge_size, badge_y + badge_size], radius=24, fill=(15, 23, 42), outline=accent_rgb, width=2)
-    badge_initial = (company[:1] if company else (name[:1] if name else "V")).upper()
-    font_badge = ImageFont.load_default(size=48)
-    font_badge_sub = ImageFont.load_default(size=11)
-    draw.text((badge_x + 48, badge_y + 36), badge_initial, fill=accent_rgb, font=font_badge)
-    draw.text((badge_x + 28, badge_y + 104), "EXECUTIVE", fill=(148, 163, 184), font=font_badge_sub)
-
-    # Bottom decorative accent bar
-    draw.rectangle([0, height - 6, width, height], fill=accent_rgb)
-
-    # 9. Output PNG bytes and base64
     buf = io.BytesIO()
     img.save(buf, format='PNG', quality=95)
-    png_bytes = buf.getvalue()
-    b64_str = f"data:image/png;base64,{base64.b64encode(png_bytes).decode('utf-8')}"
+    return buf.getvalue()
 
+
+def render_business_card_image(card_data, reference_image=None, front_html=None, css=None):
+    """
+    Master business card image generator:
+    1. Highest fidelity: Uses wkhtmltoimage if available to render Gemini's custom HTML+CSS
+    2. Reference fidelity: If reference_image provided, composites user data on reference artwork
+    3. Dynamic canvas: Fallback modern responsive canvas matching user colors and data
+    """
+    png_bytes = None
+
+    # 1. Try HTML to Image if wkhtmltoimage is installed
+    if front_html:
+        png_bytes = render_html_to_image(front_html, css)
+
+    # 2. If reference_image is present and wkhtmltoimage did not render, use reference composite
+    if not png_bytes and reference_image:
+        png_bytes = render_reference_card_composite(reference_image, card_data)
+
+    # 3. Dynamic canvas fallback
+    if not png_bytes:
+        png_bytes = render_dynamic_canvas_image(card_data)
+
+    b64_str = f"data:image/png;base64,{base64.b64encode(png_bytes).decode('utf-8')}"
     return png_bytes, b64_str

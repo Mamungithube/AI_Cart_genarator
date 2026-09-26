@@ -411,7 +411,12 @@ class CardChatAPIView(APIView):
 
         # Render high-resolution PNG & base64 image PURELY IN-MEMORY (NEVER SAVE TO DISK)
         try:
-            png_bytes, b64_str = render_business_card_image(card_data)
+            png_bytes, b64_str = render_business_card_image(
+                card_data=card_data,
+                reference_image=in_memory_image,
+                front_html=front_html,
+                css=css
+            )
         except Exception as e:
             logger.warning(f"Image rendering fallback error: {e}")
             png_bytes, b64_str = b"", ""
