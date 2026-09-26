@@ -165,7 +165,7 @@ class CardChatAPIView(APIView):
         serializer = CardSessionSerializer(sessions, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def _parse_request_inputs(self, request):
+    def post(self, request, *args, **kwargs):
         prompt = ""
         session_id_str = None
 
@@ -186,50 +186,27 @@ class CardChatAPIView(APIView):
             session_id_str = session_id_str or request.POST.get('session_id')
 
         prompt = str(prompt).strip()
+        reference_image_file = (
+            request.FILES.get('reference_image') or
+            request.FILES.get('image') or
+            request.FILES.get('file') or
+            request.FILES.get('card_image') or
+            (next(iter(request.FILES.values())) if request.FILES else None)
+        )
 
-        # Support uploaded image files across all common client field names
-        reference_image_file = None
-        if hasattr(request, 'FILES') and request.FILES:
-            reference_image_file = (
-                request.FILES.get('reference_image') or
-                request.FILES.get('image') or
-                request.FILES.get('file') or
-                request.FILES.get('card_image') or
-                request.FILES.get('photo') or
-                request.FILES.get('attachment') or
-                next(iter(request.FILES.values()), None)
-            )
+        if not prompt:
+            if reference_image_file:
+                error_msg = "Prompt is required. Please enter your card details (Name, Title, Company, Phone, etc.) or instructions along with the reference image."
+            else:
+                error_msg = "Prompt is required. Please enter your business card details or design prompt."
 
-        # Support Base64 image payload in JSON body
-        if not reference_image_file and hasattr(request, 'data') and request.data:
-            raw_b64 = (
-                request.data.get('reference_image') or
-                request.data.get('image') or
-                request.data.get('card_image') or
-                request.data.get('photo')
-            )
-            if raw_b64 and isinstance(raw_b64, str) and (raw_b64.startswith('data:image') or len(raw_b64) > 100):
-                try:
-                    import base64
-                    if ',' in raw_b64:
-                        raw_b64 = raw_b64.split(',', 1)[1]
-                    img_bytes = base64.b64decode(raw_b64)
-                    reference_image_file = io.BytesIO(img_bytes)
-                except Exception as e:
-                    logger.warning(f"Could not parse base64 reference image: {e}")
-
-        return prompt, session_id_str, reference_image_file
-
-    def post(self, request, *args, **kwargs):
-        prompt, session_id_str, reference_image_file = self._parse_request_inputs(request)
-
-        if not prompt and not reference_image_file:
             return Response(
                 {
                     "status": "error",
-                    "message": "Prompt or reference image is required",
-                    "error": "Please provide 'message', 'prompt', or a reference image.",
-                    "errors": ["Prompt or reference image is required"]
+                    "success": false,
+                    "message": error_msg,
+                    "error": "Prompt is required",
+                    "errors": [error_msg]
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
@@ -408,15 +385,34 @@ class CardSessionHistoryAPIView(APIView):
 
     def post(self, request, session_id, *args, **kwargs):
         chat_view = CardChatAPIView()
-        prompt, _, reference_image_file = chat_view._parse_request_inputs(request)
+        prompt = ""
+        if hasattr(request, 'data') and request.data:
+            prompt = request.data.get('message') or request.data.get('prompt') or ""
+        if not prompt and request.POST:
+            prompt = request.POST.get('message') or request.POST.get('prompt') or ""
+            
+        prompt = str(prompt).strip()
+        reference_image_file = (
+            request.FILES.get('reference_image') or
+            request.FILES.get('image') or
+            request.FILES.get('file') or
+            request.FILES.get('card_image') or
+            (next(iter(request.FILES.values())) if request.FILES else None)
+        )
 
-        if not prompt and not reference_image_file:
+        if not prompt:
+            if reference_image_file:
+                error_msg = "Prompt is required. Please enter your redesign instructions along with the reference image."
+            else:
+                error_msg = "Prompt is required. Please enter your redesign prompt."
+
             return Response(
                 {
                     "status": "error",
-                    "message": "Prompt or reference image is required",
-                    "error": "Please provide 'message', 'prompt', or a reference image.",
-                    "errors": ["Prompt or reference image is required"]
+                    "success": false,
+                    "message": error_msg,
+                    "error": "Prompt is required",
+                    "errors": [error_msg]
                 },
                 status=status.HTTP_400_BAD_REQUEST
             )
