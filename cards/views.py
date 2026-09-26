@@ -526,21 +526,11 @@ class CardChatAPIView(APIView):
             "session_id": str(session.id),
             "version": session.version,
             "card_data": card_data,
-            "image_base64": b64_str,
-            "image_url": b64_str,
-            "reference_image": b64_str,
-            "card": {
-                "front_html": front_html,
-                "back_html": back_html,
-                "css": css,
-                "card_data": card_data,
-            },
             "title": title or f"{card_data.get('name', 'Card')}",
             "assistant_message": bot_reply,
-            "bot_reply": bot_reply
         }
 
-        # Response schema matching generator response format with backward compatibility for web frontend UI
+        # Clean streamlined response
         return Response({
             "status": "success",
             "success": True,
@@ -548,19 +538,10 @@ class CardChatAPIView(APIView):
             "data": data_payload,
             "version": session.version,
             "assistant_message": bot_reply,
-            "bot_reply": bot_reply,
             "card_data": card_data,
             "image_base64": b64_str,
-            "image_url": b64_str,
-            "reference_image": b64_str,
             "user_prompt": prompt,
             "note": "AI-generated cards should be manually verified for text accuracy before printing or sharing.",
-            "card": {
-                "front_html": front_html,
-                "back_html": back_html,
-                "css": css,
-                "card_data": card_data,
-            },
             "title": title or f"{card_data.get('name', 'Card')}"
         }, status=status.HTTP_200_OK)
 
@@ -584,7 +565,6 @@ class CardSessionHistoryAPIView(APIView):
                 "content": m.message,
                 "card_data": m.card_data,
                 "image_base64": m.image_base64 or m.image_url,
-                "image_url": m.image_base64 or m.image_url,
                 "version": m.version,
                 "created_at": m.created_at.isoformat()
             })
