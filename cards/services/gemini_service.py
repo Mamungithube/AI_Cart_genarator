@@ -386,7 +386,11 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
     """
     ai_config = get_active_ai_config()
     api_key = ai_config.get("api_key")
-    provider = ai_config.get("provider", "gemini")
+    if not user_prompt or not str(user_prompt).strip():
+        if image_path:
+            user_prompt = "Generate an executive visiting card replicating the design, visual style, and colors of the attached reference card image."
+        else:
+            user_prompt = "Generate a luxury, executive corporate business card."
 
     # Check if user explicitly asked to create/make a new card
     if is_new_card_intent(user_prompt):

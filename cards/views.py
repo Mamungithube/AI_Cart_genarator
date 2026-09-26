@@ -165,7 +165,7 @@ class CardChatAPIView(APIView):
         serializer = CardSessionSerializer(sessions, many=True, context={'request': request})
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    def post(self, request, *args, **kwargs):
+    def _parse_request_inputs(self, request):
         prompt = ""
         session_id_str = None
 
@@ -186,11 +186,55 @@ class CardChatAPIView(APIView):
             session_id_str = session_id_str or request.POST.get('session_id')
 
         prompt = str(prompt).strip()
-        reference_image_file = request.FILES.get('reference_image')
+
+        # Support uploaded image files across all common client field names
+        reference_image_file = None
+        if hasattr(request, 'FILES') and request.FILES:
+            reference_image_file = (
+                request.FILES.get('reference_image') or
+                request.FILES.get('image') or
+                request.FILES.get('file') or
+                request.FILES.get('card_image') or
+                request.FILES.get('photo') or
+                request.FILES.get('attachment') or
+                next(iter(request.FILES.values()), None)
+            )
+
+        # Support Base64 image payload in JSON body
+        if not reference_image_file and hasattr(request, 'data') and request.data:
+            raw_b64 = (
+                request.data.get('reference_image') or
+                request.data.get('image') or
+                request.data.get('card_image') or
+                request.data.get('photo')
+            )
+            if raw_b64 and isinstance(raw_b64, str) and (raw_b64.startswith('data:image') or len(raw_b64) > 100):
+                try:
+                    import base64
+                    if ',' in raw_b64:
+                        raw_b64 = raw_b64.split(',', 1)[1]
+                    img_bytes = base64.b64decode(raw_b64)
+                    reference_image_file = io.BytesIO(img_bytes)
+                except Exception as e:
+                    logger.warning(f"Could not parse base64 reference image: {e}")
+
+        # If user attached an image but did not provide text prompt, provide a high-quality default prompt
+        if not prompt and reference_image_file:
+            prompt = "Generate an executive visiting card matching the design, layout, and visual style of the attached reference image."
+
+        return prompt, session_id_str, reference_image_file
+
+    def post(self, request, *args, **kwargs):
+        prompt, session_id_str, reference_image_file = self._parse_request_inputs(request)
 
         if not prompt and not reference_image_file:
             return Response(
-                {"status": "error", "error": "Please provide 'message' or a reference image."},
+                {
+                    "status": "error",
+                    "message": "Prompt is required",
+                    "error": "Please provide 'message', 'prompt', or a reference image.",
+                    "errors": ["Prompt is required"]
+                },
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -368,16 +412,22 @@ class CardSessionHistoryAPIView(APIView):
 
     def post(self, request, session_id, *args, **kwargs):
         chat_view = CardChatAPIView()
-        prompt = ""
-        if hasattr(request, 'data') and request.data:
-            prompt = request.data.get('message') or request.data.get('prompt') or ""
-        if not prompt and request.POST:
-            prompt = request.POST.get('message') or request.POST.get('prompt') or ""
-            
-        reference_image_file = request.FILES.get('reference_image')
+        prompt, _, reference_image_file = chat_view._parse_request_inputs(request)
+
+        if not prompt and not reference_image_file:
+            return Response(
+                {
+                    "status": "error",
+                    "message": "Prompt is required",
+                    "error": "Please provide 'message', 'prompt', or a reference image.",
+                    "errors": ["Prompt is required"]
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
         return chat_view._handle_card_turn(
             request,
-            prompt=str(prompt).strip(),
+            prompt=prompt,
             session_id_str=str(session_id),
             reference_image_file=reference_image_file
         )
