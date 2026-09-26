@@ -1,7 +1,10 @@
 import os
+import io
 import json
 import re
+import base64
 import logging
+import requests
 from pathlib import Path
 from django.conf import settings
 from PIL import Image
@@ -510,84 +513,176 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
 
 
 
+def _prepare_image_data(image_path):
+    """
+    Normalizes any image input (PIL Image, BytesIO, UploadedFile, file path, base64 string)
+    into:
+    - pil_img: PIL.Image in RGB mode
+    - b64_str: base64 string
+    - mime_type: e.g. 'image/jpeg'
+    """
+    if not image_path:
+        return None, None, None
+
+    pil_img = None
+    try:
+        if isinstance(image_path, Image.Image):
+            pil_img = image_path
+        elif hasattr(image_path, 'read'):
+            try:
+                image_path.seek(0)
+            except Exception:
+                pass
+            pil_img = Image.open(image_path)
+        elif isinstance(image_path, str):
+            image_path_str = image_path.strip()
+            if image_path_str.startswith('data:image'):
+                b64_part = image_path_str.split(',', 1)[1] if ',' in image_path_str else image_path_str
+                img_bytes = base64.b64decode(b64_part)
+                pil_img = Image.open(io.BytesIO(img_bytes))
+            elif os.path.exists(image_path_str):
+                pil_img = Image.open(image_path_str)
+            elif len(image_path_str) > 100:
+                try:
+                    img_bytes = base64.b64decode(image_path_str)
+                    pil_img = Image.open(io.BytesIO(img_bytes))
+                except Exception:
+                    pass
+
+        if pil_img:
+            pil_img.load()
+            if pil_img.mode not in ('RGB', 'L'):
+                pil_img = pil_img.convert('RGB')
+            buf = io.BytesIO()
+            pil_img.save(buf, format='JPEG', quality=92)
+            b64_str = base64.b64encode(buf.getvalue()).decode('utf-8')
+            return pil_img, b64_str, 'image/jpeg'
+    except Exception as e:
+        logger.warning(f"Error preparing image data for vision model: {e}")
+
+    return None, None, None
+
+
 def _call_gemini_api(api_key, prompt_text, image_path=None, project_id=None):
-    """Calls Google Gemini using google-genai or google.generativeai"""
+    """
+    Calls Google Gemini using google-genai SDK or direct REST API fallback.
+    Supported models: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.6-flash, gemini-flash-latest.
+    """
+    candidate_models = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-flash-latest"]
+    full_prompt_text = f"{SYSTEM_CARD_PROMPT}\n\nTask:\n{prompt_text}"
+
+    pil_img, b64_img, mime_type = _prepare_image_data(image_path)
+    last_error = None
+
+    # 1. Attempt using official google-genai SDK if available
     try:
         from google import genai
         from google.genai import types
-        
-        # Google AI Studio API key does not take project/location
+
         client = genai.Client(api_key=api_key)
-        contents = []
-
-        if image_path:
-            if isinstance(image_path, Image.Image):
-                contents.append(image_path)
-            elif isinstance(image_path, str) and os.path.exists(image_path):
-                img = Image.open(image_path)
-                contents.append(img)
-            
-        contents.append(f"{SYSTEM_CARD_PROMPT}\n\nTask:\n{prompt_text}")
-
-        # Models to try in order of availability and quota
-        candidate_models = ["gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-2.5-flash"]
-        last_error = None
+        sdk_contents = []
+        if pil_img:
+            sdk_contents.append(pil_img)
+        sdk_contents.append(full_prompt_text)
 
         for model_name in candidate_models:
             try:
-                # Enable thinking budget so Gemini visually reasons through layout before coding CSS
                 gen_config = types.GenerateContentConfig(
                     response_mime_type="application/json",
-                    thinking_config=types.ThinkingConfig(thinking_budget=2048)
+                    temperature=0.2,
                 )
                 response = client.models.generate_content(
                     model=model_name,
-                    contents=contents,
+                    contents=sdk_contents,
                     config=gen_config
                 )
-                data = extract_json_from_text(response.text)
-                if data and "front_html" in data:
-                    return data
-            except Exception as e:
-                # If thinking_config fails on a model, retry without it
-                try:
-                    response = client.models.generate_content(
-                        model=model_name,
-                        contents=contents,
-                        config=types.GenerateContentConfig(response_mime_type="application/json")
-                    )
+                if response and response.text:
                     data = extract_json_from_text(response.text)
                     if data and "front_html" in data:
                         return data
-                except Exception as inner_e:
-                    last_error = inner_e
-                    logger.warning(f"Model {model_name} failed: {inner_e}. Trying next model...")
-                    continue
-
-
-        if last_error:
-            raise last_error
-        raise ValueError("Could not extract card data from Gemini response")
-
+            except Exception as e:
+                last_error = e
+                logger.warning(f"google.genai SDK model {model_name} failed: {e}. Trying next...")
+                continue
     except ImportError:
-        # Fallback to google.generativeai legacy package
+        pass
+    except Exception as e:
+        last_error = e
+        logger.warning(f"google.genai SDK call failed: {e}. Falling back to REST API...")
+
+    # 2. Direct HTTP REST API via requests (zero SDK dependency, 100% reliable)
+    session = requests.Session()
+
+    for model_name in candidate_models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+        parts = []
+        if b64_img and mime_type:
+            parts.append({
+                "inline_data": {
+                    "mime_type": mime_type,
+                    "data": b64_img
+                }
+            })
+        parts.append({
+            "text": full_prompt_text
+        })
+
+        payload = {
+            "contents": [{
+                "role": "user",
+                "parts": parts
+            }],
+            "generationConfig": {
+                "responseMimeType": "application/json",
+                "temperature": 0.2
+            }
+        }
+
+        try:
+            resp = session.post(url, json=payload, timeout=45)
+            if resp.status_code == 200:
+                resp_json = resp.json()
+                candidates = resp_json.get("candidates", [])
+                if candidates:
+                    parts_resp = candidates[0].get("content", {}).get("parts", [])
+                    if parts_resp and "text" in parts_resp[0]:
+                        data = extract_json_from_text(parts_resp[0]["text"])
+                        if data and "front_html" in data:
+                            return data
+            else:
+                last_error = f"HTTP {resp.status_code}: {resp.text[:150]}"
+                logger.warning(f"Gemini REST model {model_name} failed with status {resp.status_code}: {resp.text[:100]}")
+        except Exception as e:
+            last_error = str(e)
+            logger.warning(f"Gemini REST model {model_name} error: {e}")
+
+    # 3. Legacy google.generativeai fallback if all above fail
+    try:
         import google.generativeai as gai
         gai.configure(api_key=api_key)
-        model = gai.GenerativeModel('gemini-1.5-flash')
-        parts = []
-        if image_path and os.path.exists(image_path):
-            parts.append(Image.open(image_path))
-        parts.append(f"{SYSTEM_CARD_PROMPT}\n\nTask:\n{prompt_text}")
-        response = model.generate_content(parts)
-        data = extract_json_from_text(response.text)
-        if data and "front_html" in data:
-            return data
-        raise ValueError("Invalid JSON from Gemini legacy")
+        for legacy_model in ["gemini-1.5-flash-latest", "gemini-1.5-pro"]:
+            try:
+                model = gai.GenerativeModel(legacy_model)
+                parts = []
+                if pil_img:
+                    parts.append(pil_img)
+                parts.append(full_prompt_text)
+                response = model.generate_content(parts)
+                data = extract_json_from_text(response.text)
+                if data and "front_html" in data:
+                    return data
+            except Exception:
+                continue
+    except Exception:
+        pass
+
+    if last_error:
+        raise ValueError(f"Gemini API generation failed across all models: {last_error}")
+    raise ValueError("Could not extract card design from Gemini response")
 
 
 def _call_openai_api(api_key, prompt_text, image_path=None):
     """Calls OpenAI API with vision support"""
-    import base64
     from openai import OpenAI
 
     client = OpenAI(api_key=api_key)
@@ -597,28 +692,12 @@ def _call_openai_api(api_key, prompt_text, image_path=None):
 
     user_content = [{"type": "text", "text": prompt_text}]
 
-    if image_path:
-        if isinstance(image_path, Image.Image):
-            import io
-            buf = io.BytesIO()
-            image_path.save(buf, format='PNG')
-            encoded_string = base64.b64encode(buf.getvalue()).decode('utf-8')
-            user_content.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/png;base64,{encoded_string}"}
-            })
-        elif isinstance(image_path, str) and os.path.exists(image_path):
-            with open(image_path, "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-                mime = "image/jpeg"
-                if image_path.lower().endswith('.png'):
-                    mime = "image/png"
-                elif image_path.lower().endswith('.webp'):
-                    mime = "image/webp"
-                user_content.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{mime};base64,{encoded_string}"}
-                })
+    pil_img, b64_img, mime_type = _prepare_image_data(image_path)
+    if b64_img:
+        user_content.append({
+            "type": "image_url",
+            "image_url": {"url": f"data:{mime_type};base64,{b64_img}"}
+        })
 
     messages.append({"role": "user", "content": user_content})
 

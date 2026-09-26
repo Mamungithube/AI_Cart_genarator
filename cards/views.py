@@ -350,7 +350,11 @@ class CardChatAPIView(APIView):
         if reference_image_file:
             try:
                 reference_image_file.seek(0)
-                in_memory_image = Image.open(reference_image_file)
+                img = Image.open(reference_image_file)
+                img.load()
+                if img.mode not in ('RGB', 'L'):
+                    img = img.convert('RGB')
+                in_memory_image = img
             except Exception as e:
                 logger.warning(f"Could not open in-memory reference image: {e}")
 
