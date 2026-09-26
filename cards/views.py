@@ -23,7 +23,6 @@ from .services.gemini_service import (
     generate_business_card_with_ai,
     get_active_ai_config,
     save_ai_config,
-    is_new_card_intent,
 )
 from .services.card_templates import render_fallback_card
 from .services.image_renderer import render_business_card_image
@@ -222,9 +221,9 @@ def extract_reference_image_from_request(request):
                 if bio:
                     return bio, b64
 
-    # 4. Check request.body JSON
-    if hasattr(request, 'body') and request.body:
-        try:
+    # 4. Check request.body JSON (safely guarded)
+    try:
+        if hasattr(request, 'body') and request.body:
             b_json = json.loads(request.body.decode('utf-8'))
             if isinstance(b_json, dict):
                 nested = b_json.get('data')
@@ -244,8 +243,8 @@ def extract_reference_image_from_request(request):
                         bio, b64 = _parse_raw_image_val(b_json[k])
                         if bio:
                             return bio, b64
-        except Exception:
-            pass
+    except Exception:
+        pass
 
     return None, ""
 
@@ -322,9 +321,10 @@ class CardChatAPIView(APIView):
             if not session_id_str:
                 session_id_str = request.data.get('session_id')
 
-        if not prompt and request.body:
+        if not prompt:
             try:
-                b_data = json.loads(request.body.decode('utf-8'))
+                if hasattr(request, 'body') and request.body:
+                    b_data = json.loads(request.body.decode('utf-8'))
                 nested_data = b_data.get('data')
                 if isinstance(nested_data, dict):
                     prompt = (
@@ -396,8 +396,7 @@ class CardChatAPIView(APIView):
             except Exception:
                 session = None
 
-        is_new = is_new_card_intent(prompt)
-        if not session or is_new:
+        if not session:
             session = CardSession.objects.create(title="Corporate Business Card", version=1)
         else:
             session.version = (session.version or 1) + 1
@@ -441,9 +440,18 @@ class CardChatAPIView(APIView):
             version=session.version
         )
 
+        # Collect conversation history from session
+        chat_history = []
+        if session:
+            for m in session.messages.all().order_by('created_at')[:8]:
+                chat_history.append({
+                    "role": "user" if m.sender == 'user' else "assistant",
+                    "text": m.message or ""
+                })
+
         # Contextual previous card state (if redesign iteration)
         previous_card = None
-        if session.front_html and not is_new:
+        if session and session.front_html:
             previous_card = {
                 "front_html": session.front_html,
                 "back_html": session.back_html,
@@ -456,7 +464,9 @@ class CardChatAPIView(APIView):
             ai_result = generate_business_card_with_ai(
                 user_prompt=prompt,
                 image_path=in_memory_image,
-                previous_card=previous_card
+                previous_card=previous_card,
+                chat_history=chat_history,
+                session_id=str(session.id)
             )
         except Exception as e:
             logger.error(f"Card generation failed: {e}")

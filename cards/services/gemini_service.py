@@ -105,21 +105,70 @@ Your code must dynamically adapt to whatever visual style, geometry, or referenc
    - **Foreground Content Layer (`z-index: 5`)**: The brand logo/company section and the cardholder identity section MUST reside in clean foreground containers with `position: relative; z-index: 5;`.
    - **Breathing Room**: Ensure all text has comfortable padding and margins. No decorative artwork may ever collide with, overlap, or clip any text.
 
-### ✒️ TYPOGRAPHIC MASTERY & HIERARCHY:
-- **Full Name**: Bold, crisp, commanding (`font-size: 24px - 28px; font-weight: 700; letter-spacing: -0.4px; line-height: 1.15; color: #FFFFFF on dark / #0F172A on light;`).
-- **Job Title**: Refined, readable (`font-size: 13px - 14.5px; font-weight: 400; color: #d0d7de on dark / #64748B on light; margin-top: 4px; margin-bottom: 8px;`).
-- **Accent Hairline Bar**: A 50px - 60px wide, 2px tall bar beneath the title (`background: #FFFFFF on dark / accent_color; margin-top: 6px; margin-bottom: 18px;`).
-- **Contact Rows**: Clean vertical stack (`display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 12.5px; font-weight: 500; color: #e6edf3;`).
-  - Icons: Crisp vector SVG or Font Awesome icon (`width: 16px; text-align: center; color: accent_color or #ffffff;`).
+### ✒️ TYPOGRAPHIC MASTERY & HIERARCHY (PERFECTLY PROPORTIONED FOR 1050x600 CANVAS):
+- **Full Name**: Bold, commanding, highly legible and prominent (`font-size: 38px - 44px; font-weight: 800; letter-spacing: -0.5px; line-height: 1.15; color: #FFFFFF on dark / #0F172A on light;`).
+- **Job Title**: Refined, prestigious (`font-size: 18px - 21px; font-weight: 500; letter-spacing: 0.5px; color: #d0d7de on dark / #475569 on light; margin-top: 6px; margin-bottom: 12px;`).
+- **Accent Hairline Bar**: A 60px - 80px wide, 3px tall bar beneath the title (`background: #FFFFFF on dark / accent_color; margin-top: 6px; margin-bottom: 22px;`).
+- **Company Name / Brand Header**: (`font-size: 26px - 32px; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: #FFFFFF;`).
+- **Company Tagline**: (`font-size: 13px - 15px; letter-spacing: 2px; text-transform: uppercase; color: #94A3B8; margin-top: 4px;`).
+- **Contact Rows**: Clean vertical stack (`display: flex; align-items: center; gap: 14px; margin-bottom: 14px; font-size: 16px - 18px; font-weight: 500; color: #e6edf3;`).
+  - Icons: Crisp vector SVG or icon (`width: 20px; height: 20px; text-align: center; color: accent_color or #ffffff;`).
 
 ### 👑 HARMONIOUS COMPANION BACK SIDE:
 The back side must share the exact same aesthetic DNA, color scheme, and graphic language as the front:
 - Mirror or complement the front's graphic motif (e.g. if the front has twisted ribbons or angular cuts on the left, the back carries a coordinated accent framing the brand presentation).
 - Center Brand Presentation:
-  - Brand Emblem / Monogram: An iconic vector emblem or monogram badge.
-  - Company Title: Bold uppercase heading (`font-size: 20px - 22px; font-weight: 800; letter-spacing: 3.5px; text-transform: uppercase; color: #FFFFFF;`).
-  - Company Tagline: Refined micro-caps (`font-size: 9px - 10px; letter-spacing: 2px; text-transform: uppercase; color: #94A3B8; margin-top: 4px; margin-bottom: 16px;`).
-  - Website Pill Badge: Glassmorphic pill (`padding: 6px 18px; border-radius: 20px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); font-size: 10px; color: accent_color; font-weight: 600;`).
+  - Brand Emblem / Monogram: An iconic vector emblem or monogram badge (`width: 76px; height: 76px; font-size: 32px; font-weight: 900; border-radius: 20px;`).
+  - Company Title: Bold uppercase heading (`font-size: 32px - 36px; font-weight: 800; letter-spacing: 4px; text-transform: uppercase; color: #FFFFFF;`).
+  - Company Tagline: Refined micro-caps (`font-size: 13px - 15px; letter-spacing: 2.5px; text-transform: uppercase; color: #94A3B8; margin-top: 6px; margin-bottom: 24px;`).
+  - Website Pill Badge: Glassmorphic pill (`padding: 10px 28px; border-radius: 25px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); font-size: 15px - 17px; color: accent_color; font-weight: 600;`).
+
+### 📐 RADICAL LAYOUT DIVERSITY & "CHANGE DESIGN" RULES:
+When the user asks to "change the design", "change design", "disign change", "different layout", "new design", "design change not color", "ডিজাইন পরিবর্তন করো", "নতুন লেআউট", etc.:
+1. NEVER RECYCLE THE SAME LAYOUT STRUCTURE:
+   Do NOT simply change colors or tweak a curve and call it a redesign! The user expects a genuine, dramatic structural transformation in layout geometry and spatial composition.
+2. DIVERSE LAYOUT ARCHETYPES (CHOOSE A COMPLETELY DIFFERENT ONE ON REDESIGN):
+   - **Archetype 1: Swiss Minimalist Architectural Grid**:
+     * Clean, crisp whitespace with stark modern hierarchy.
+     * Left-aligned typography, razor-sharp hairline dividers, zero curved ribbons. High-end editorial feel.
+   - **Archetype 2: Centered Executive Monogram & Symmetrical Horizon**:
+     * Centered luxury monogram emblem at the top.
+     * Large centered cardholder name and title in the middle.
+     * Balanced horizontal two-column contact details aligned along the bottom.
+   - **Archetype 3: Vertical Brand Sidebar / Pillar Layout**:
+     * Strong contrasting vertical sidebar/pillar on the left (or right) housing the brand logo and company name vertically or stacked.
+     * The remaining clean card area dedicated to the cardholder credentials with rich generous margins.
+   - **Archetype 4: Sharp Angular / Origami Polygonal Facets**:
+     * Bold diagonal cuts using CSS `clip-path: polygon(...)` or sharp 45-degree architectural panels with metallic edges.
+   - **Archetype 5: Dual-Tone Split Horizon**:
+     * Top half deep tone with brand identity; bottom half contrasting executive tone with contact matrix.
+3. "DESIGN CHANGE, NOT COLOR" DIRECTIVE:
+   - When the user says "design change not color", "disign change not color", "কালার না, ডিজাইন চেঞ্জ করো", or similar:
+   - PRESERVE the exact current color scheme (the user is happy with the colors!).
+   - RADICALLY CHANGE the layout structure, geometry, and placement to a totally different archetype!
+4. "COLOR CHANGE ONLY" DIRECTIVE:
+   - When the user asks ONLY for a color tweak (e.g. "make it navy blue", "লাল ব্যাকগ্রাউন্ড দিন"):
+   - Maintain the structural layout while re-engineering the color palette, gradients, and contrast.
+
+### 🧠 CONVERSATION REASONING & INTENT RECOGNITION (PROMPT ENGINEERING):
+1. **Dynamic Intent Recognition**:
+   - Autonomously understand the user's intent from conversational context and session history:
+     * **Aesthetic / Styling Revision**: When the user requests a color change, dark/light theme switch, font adjustment, or layout tweak (e.g. 'change background color red', 'make it midnight black with gold accents', 'লাল ব্যাকগ্রাউন্ড দিন', 'can we make it look more corporate?'):
+       - Treat this strictly as a visual design and styling directive.
+       - NEVER treat the styling instruction or color name as the person's name, title, or company!
+       - Retain all existing cardholder credentials (Name, Title, Company, Phone, Email, etc.) in `card_data` and in the HTML.
+       - Dynamically rethink the entire visual composition: canvas background, gradients, SVG geometric artwork, typography contrast, and companion back side.
+     * **Layout & Design Overhaul**: When the user asks to change the design or layout ('change the design', 'design change not color', 'নতুন ডিজাইন'):
+       - Completely revolutionize the layout geometry, choosing a different archetype from above.
+     * **Contact Details Update**: When the user asks to change or provide contact details (e.g. 'my name is ...', 'change phone to ...', 'company: TechCorp'):
+       - Update that specific field in `card_data` and on the card. Keep all other fields untouched.
+     * **New Card Request**: When the user asks to create a new card from scratch:
+       - Autonomously extract the person's real credentials into `card_data` and synthesize a new bespoke brand identity.
+
+2. **Multimodal Reference Image with Redesign Freedom**:
+   - If a reference card image is attached:
+     * Visually deconstruct and capture its graphic artwork (twisted ribbons, waves, angular cuts, monogram).
+     * If the user in the current turn requests a different color or style (e.g. red, gold, minimal), YOUR NEW COLOR PALETTE MUST OVERRIDE the reference image colors! Do not lock into old colors when the user asks for a change.
 
 ### 🚨 FORBIDDEN PRACTICES (ZERO TOLERANCE):
 1. NO fixed or repetitive templates — design must adapt specifically to the reference or prompt.
@@ -127,6 +176,13 @@ The back side must share the exact same aesthetic DNA, color scheme, and graphic
 3. NO hardcoded placeholder or dummy text ("YOUR NAME", "GRAPHIC DESIGNER", "123 Dummy Street", "Lorem Ipsum").
 4. NO low contrast text (e.g. dark text on dark background, or light text on light shapes).
 5. STRICTLY NO QR CODES OR BARCODES: Even if the user reference card image contains a QR code, barcode, or scan box, NEVER generate or include any QR code, barcode, QR SVG, or scan frame in the Front HTML, Back HTML, or CSS. Completely omit all QR codes from the design!
+6. STRICTLY NO TINY OR COMPACT FONTS: The card canvas is 1050x600 px (high resolution). Tiny fonts (such as 8px - 14px for names/titles, or under 16px for contact details) are completely unreadable and strictly prohibited! You MUST use generous, prominent font sizes:
+   - Full Name: 38px - 44px (bold, prominent, commanding)
+   - Job Title: 18px - 21px (clear and legible)
+   - Company Name: 26px - 32px (bold header)
+   - Company Tagline: 13px - 15px
+   - Contact Items (Phone, Email, Web, Address): 16px - 18px (with 20px icons)
+   - Back Side Brand Name: 32px - 36px, Tagline: 13px - 15px, Website Pill: 15px - 17px
 
 ### OUTPUT FORMAT:
 You MUST output ONLY valid JSON matching this schema:
@@ -175,239 +231,87 @@ def extract_json_from_text(text):
 
 
 def extract_contact_info_from_prompt(prompt):
-    """Accurately extracts contact info from prompt without ANY hardcoded dummy names"""
-    name = ""
-    title = ""
-    company = ""
-    tagline = ""
-    phone = ""
-    email = ""
-    website = ""
-    address = ""
+    """
+    Extracts explicitly labeled contact fields (e.g. 'Name: John', 'Phone: +880...', 'Email: ...')
+    without any hardcoded keyword lists or fragile regex guessing.
+    All semantic intent recognition and reasoning is delegated to the AI model.
+    """
+    info = {
+        "name": "", "title": "", "company": "", "tagline": "",
+        "phone": "", "email": "", "website": "", "address": ""
+    }
+    if not prompt:
+        return info
 
-    # Search for phone
     phone_match = re.search(r'(\+?\d[\d\s\-\(\)]{8,}\d)', prompt)
     if phone_match:
-        phone = phone_match.group(1).strip()
+        info['phone'] = phone_match.group(1).strip()
 
-    # Search for email
     email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', prompt)
     if email_match:
-        email = email_match.group(0).strip()
+        info['email'] = email_match.group(0).strip()
 
-    # Search for website
     web_match = re.search(r'(?:https?:\/\/)?(?:www\.)?[\w\.-]+\.(?:com|io|net|org|xyz|ai|co|bd|info)', prompt)
     if web_match:
-        website = web_match.group(0).strip()
+        info['website'] = web_match.group(0).strip()
 
-    # Check lines
-    raw_lines = [l.strip() for l in prompt.split('\n') if l.strip()]
-    candidate_lines = []
-
-    for line in raw_lines:
+    # Search for explicit labeled lines only
+    for line in prompt.split('\n'):
+        line = line.strip()
         lower = line.lower()
         if any(k in lower for k in ['name:', 'নাম:', 'name -']):
-            name = re.sub(r'^(name|নাম)\s*[:\-]\s*', '', line, flags=re.I).strip()
+            info['name'] = re.sub(r'^(name|নাম)\s*[:\-]\s*', '', line, flags=re.I).strip()
         elif any(k in lower for k in ['title:', 'পদবী:', 'পদবি:', 'role:', 'designation:']):
-            title = re.sub(r'^(title|পদবী|পদবি|role|designation)\s*[:\-]\s*', '', line, flags=re.I).strip()
+            info['title'] = re.sub(r'^(title|পদবী|পদবি|role|designation)\s*[:\-]\s*', '', line, flags=re.I).strip()
         elif any(k in lower for k in ['company:', 'কোম্পানি:', 'org:']):
-            company = re.sub(r'^(company|কোম্পানি|org)\s*[:\-]\s*', '', line, flags=re.I).strip()
+            info['company'] = re.sub(r'^(company|কোম্পানি|org)\s*[:\-]\s*', '', line, flags=re.I).strip()
         elif any(k in lower for k in ['address:', 'ঠিকানা:', 'location:']):
-            address = re.sub(r'^(address|ঠিকানা|location)\s*[:\-]\s*', '', line, flags=re.I).strip()
+            info['address'] = re.sub(r'^(address|ঠিকানা|location)\s*[:\-]\s*', '', line, flags=re.I).strip()
         elif any(k in lower for k in ['tagline:', 'slogan:']):
-            tagline = re.sub(r'^(tagline|slogan)\s*[:\-]\s*', '', line, flags=re.I).strip()
-        else:
-            # Check if this line is NOT a phone, email, website, or meta prompt instruction
-            if not re.search(r'[\w\.-]+@[\w\.-]+', line) and \
-               not re.search(r'\+?\d{7,}', line) and \
-               not any(kw in lower for kw in ['create', 'business card', 'visiting card', 'minimal', 'modern', 'design', 'layout', 'for:', 'white text', 'blue accent', 'style']):
-                candidate_lines.append(line)
+            info['tagline'] = re.sub(r'^(tagline|slogan)\s*[:\-]\s*', '', line, flags=re.I).strip()
 
-    # If name/title/company weren't explicitly labeled, infer from candidate lines
-    if not name and candidate_lines:
-        name = candidate_lines[0]
-        if len(candidate_lines) > 1 and not title:
-            title = candidate_lines[1]
-        if len(candidate_lines) > 2 and not company:
-            company = candidate_lines[2]
-
-    # Check for sentence pattern: "for [Name], [Title] at [Company]"
-    inline_match = re.search(r'for\s+([A-Za-z\.\s]+?),\s*([A-Za-z\s]+?)\s+at\s+([^,]+)', prompt, re.I)
-    if inline_match:
-        if not name:
-            name = inline_match.group(1).strip()
-        if not title:
-            title = inline_match.group(2).strip()
-        if not company:
-            company = inline_match.group(3).strip()
-
-    return {
-        "name": name,
-        "title": title,
-        "company": company,
-        "tagline": tagline,
-        "phone": phone,
-        "email": email,
-        "website": website,
-        "address": address
-    }
+    return info
 
 
-def is_new_card_intent(prompt):
-    """Detects if prompt is an explicit instruction to create a new card from scratch"""
-    if not prompt:
-        return False
-    lower = prompt.lower().strip()
-    lower = re.sub(r'^["\']|["\']$', '', lower)
-    patterns = [
-        r'\b(make|create|design|generate)\s+(a\s+)?(new\s+)?(visiting|business)?\s*card\b',
-        r'\b(card\s+for|visiting\s+card\s+for|business\s+card\s+for)\b',
-        r'\b(নতুন\s+কার্ড|কার্ড\s+বানাও|ভিজিটিং\s+কার্ড\s+বানাও)\b',
-    ]
-    return any(re.search(pat, lower) for pat in patterns)
-
-
-
-
-def sanitize_and_preserve_user_data(ai_data, active_user_data):
+def preserve_card_identity(ai_data, previous_card_data):
     """
-    Ensures placeholder text from reference images ('YOUR NAME', 'GRAPHIC DESIGNER',
-    '123 Dummy', 'your email space', etc.) NEVER replaces real user data.
+    Ensures that during iterative design sessions, any existing contact credentials
+    (phone, email, website, etc.) that were not explicitly modified remain preserved in card_data.
+    All text embedding and visual styling is handled natively by Gemini.
     """
-    if not ai_data or not active_user_data:
+    if not ai_data or not isinstance(ai_data, dict):
         return ai_data
 
     card_data = ai_data.get('card_data', {})
-    dummy_names = ['YOUR NAME', 'NAME HERE', 'JOHN DOE', 'JANE DOE', 'SAMPLE NAME', 'YOURNAME']
-    dummy_titles = ['GRAPHIC DESIGNER', 'YOUR TITLE', 'DESIGNATION', 'CREATIVE DESIGNER', 'TITLE HERE']
-    dummy_companies = ['COMPANY NAME', 'YOUR COMPANY', 'BRAND NAME', 'TAGLINE HERE']
-
-    user_name = active_user_data.get('name')
-    user_title = active_user_data.get('title')
-    user_company = active_user_data.get('company')
-    user_phone = active_user_data.get('phone')
-    user_email = active_user_data.get('email')
-    user_website = active_user_data.get('website')
-    user_address = active_user_data.get('address')
-
-    # Guard card_data dict
-    if user_name and (not card_data.get('name') or any(d in str(card_data.get('name', '')).upper() for d in dummy_names)):
-        card_data['name'] = user_name
-    if user_title and (not card_data.get('title') or any(d in str(card_data.get('title', '')).upper() for d in dummy_titles)):
-        card_data['title'] = user_title
-    if user_company and (not card_data.get('company') or any(d in str(card_data.get('company', '')).upper() for d in dummy_companies)):
-        card_data['company'] = user_company
-    if user_phone and (not card_data.get('phone') or '1234 5xxx' in str(card_data.get('phone', '')).lower() or 'dummy' in str(card_data.get('phone', '')).lower()):
-        card_data['phone'] = user_phone
-    if user_email and (not card_data.get('email') or 'your email' in str(card_data.get('email', '')).lower() or 'email@' in str(card_data.get('email', '')).lower()):
-        card_data['email'] = user_email
-    if user_website and (not card_data.get('website') or 'website address' in str(card_data.get('website', '')).lower()):
-        card_data['website'] = user_website
-    if user_address and (not card_data.get('address') or 'dummy' in str(card_data.get('address', '')).lower() or 'lorem' in str(card_data.get('address', '')).lower()):
-        card_data['address'] = user_address
+    if previous_card_data and isinstance(previous_card_data, dict):
+        for k, v in previous_card_data.items():
+            if v and not card_data.get(k):
+                card_data[k] = v
 
     ai_data['card_data'] = card_data
-
-    # Sanitize HTML
-    front_html = ai_data.get('front_html', '')
-    back_html = ai_data.get('back_html', '')
-
-    replacements = []
-    if user_name:
-        replacements.extend([
-            ('YOUR NAME', user_name),
-            ('Your Name', user_name),
-            ('your name', user_name),
-            ('John Doe', user_name),
-        ])
-    if user_title:
-        replacements.extend([
-            ('GRAPHIC DESIGNER', user_title),
-            ('Graphic Designer', user_title),
-            ('graphic designer', user_title),
-            ('CREATIVE DESIGNER', user_title),
-            ('Creative Designer', user_title),
-        ])
-    if user_company:
-        replacements.extend([
-            ('COMPANY NAME', user_company),
-            ('Company Name', user_company),
-            ('YOUR COMPANY', user_company),
-        ])
-    if user_phone:
-        replacements.extend([
-            ('+00 1234 5XXX 9012', user_phone),
-            ('+00 1234 5xxx 9012', user_phone),
-            ('+00 1234 5678 9012', user_phone),
-            ('+1 234 567 890', user_phone),
-        ])
-    if user_email:
-        replacements.extend([
-            ('your email space', user_email),
-            ('youremail@email.com', user_email),
-            ('name@example.com', user_email),
-            ('email@example.com', user_email),
-        ])
-    if user_website:
-        replacements.extend([
-            ('website address here', user_website),
-            ('www.website.com', user_website),
-            ('www.example.com', user_website),
-        ])
-    if user_address:
-        replacements.extend([
-            ('123 Dummy, Lorem Ipsum', user_address),
-            ('123 Dummy, Lorem', user_address),
-            ('123 Street Name, City', user_address),
-            ('City, Country', user_address),
-        ])
-
-    for target, rep in replacements:
-        if target in front_html:
-            front_html = front_html.replace(target, rep)
-        if target in back_html:
-            back_html = back_html.replace(target, rep)
-
-    # Strip any accidental QR code or barcode elements
-    for qr_pattern in [
-        r'''<div[^>]*class=["'][^"']*(?:qr|barcode|scan-code|scan_code)[^"']*["'][^>]*>[\s\S]*?</div>''',
-        r'''<div[^>]*id=["'][^"']*(?:qr|barcode|scan-code|scan_code)[^"']*["'][^>]*>[\s\S]*?</div>''',
-        r'''<svg[^>]*class=["'][^"']*(?:qr|barcode)[^"']*["'][^>]*>[\s\S]*?</svg>''',
-    ]:
-        front_html = re.sub(qr_pattern, '', front_html, flags=re.IGNORECASE)
-        back_html = re.sub(qr_pattern, '', back_html, flags=re.IGNORECASE)
-
-    ai_data['front_html'] = front_html
-    ai_data['back_html'] = back_html
     return ai_data
 
 
-def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=None, chat_history=None):
+def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=None, chat_history=None, session_id=None):
     """
     Main generator supporting Gemini API and OpenAI.
-    Supports initial generation and iterative redesigns while strictly preserving user details.
+    Supports initial generation and autonomous, creative redesigns without fixed templates.
+    Leverages complete session context, conversation history, and reference images.
     """
     ai_config = get_active_ai_config()
     api_key = ai_config.get("api_key")
     provider = ai_config.get("provider", "gemini")
 
-    # Check if user explicitly asked to create/make a new card
-    if is_new_card_intent(user_prompt):
-        previous_card = None
-        active_user_data = {}
-    else:
-        # Track and accumulate active user contact data across redesign iterations
-        active_user_data = {}
-        if previous_card and previous_card.get("card_data"):
-            active_user_data.update(previous_card.get("card_data"))
+    is_redesign = bool(previous_card and previous_card.get("front_html"))
+    active_user_data = {}
+    if previous_card and previous_card.get("card_data"):
+        active_user_data.update(previous_card.get("card_data"))
 
-    # Extract any contact details from the prompt and merge/override
+    # Extract any explicit labeled fields (e.g. 'Name: John') from prompt if present
     new_extracted = extract_contact_info_from_prompt(user_prompt)
     for k, v in new_extracted.items():
         if v:
-            # Overwrite with newly detected name/title/company/etc. from prompt
             active_user_data[k] = v
-
 
     # Fallback if no API key
     if not api_key:
@@ -419,16 +323,88 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
         )
         return res
 
-    # Construct context instructions for Gemini
+    # Construct context instructions for Gemini with full Prompt Engineering
     task_instructions = []
-    if previous_card and previous_card.get("front_html"):
-        task_instructions.append(
-            "THIS IS A REDESIGN REQUEST FOR AN EXISTING CARD. The user wants you to modify/refine the design based on their feedback."
+
+    if session_id:
+        task_instructions.append(f"SESSION ID: {session_id}")
+
+    if chat_history:
+        history_lines = ["RECENT CONVERSATION HISTORY IN THIS STUDIO SESSION:"]
+        for msg in chat_history[-6:]:
+            role = "User" if msg.get("role") == "user" else "AI Assistant"
+            txt = msg.get("content") or msg.get("text") or msg.get("message") or ""
+            if txt:
+                history_lines.append(f"- {role}: {txt}")
+        task_instructions.append("\n".join(history_lines))
+
+    if is_redesign:
+        lower_p = user_prompt.lower()
+        is_design_redesign = any(w in lower_p for w in [
+            'design', 'disign', 'layout', 'style', 'structure', 'ডিজাইন', 'লেআউট', 'স্টাইল', 'গঠন', 'আর্কিটেকচার'
+        ])
+        is_not_color = any(w in lower_p for w in [
+            'not color', 'no color', 'কালার না', 'কালার নয়', 'কালার ছাড়া', 'রং না', 'without color'
+        ])
+
+        redesign_blocks = [
+            f"🚨 THIS IS A REDESIGN / DESIGN REVISION REQUEST FOR AN EXISTING CARD.\n"
+            f"USER REDESIGN INSTRUCTIONS:\n"
+            f"\"{user_prompt}\"\n\n"
+            f"🚨 AUTONOMOUS DESIGN THINKING DIRECTIVES (STRICTLY NO FIXED TEMPLATES):\n"
+        ]
+
+        if is_design_redesign:
+            redesign_blocks.append(
+                "💥 RADICAL ARCHITECTURAL & LAYOUT METAMORPHOSIS REQUIRED:\n"
+                "- The user explicitly commanded: 'CHANGE THE DESIGN' / 'NEW LAYOUT'!\n"
+                "- YOU ARE STRICTLY FORBIDDEN from recycling the previous layout, DOM structure, or wave/ribbon shapes!\n"
+                "- You MUST craft a RADICALLY DIFFERENT visual archetype from scratch:\n"
+                "  * Choice A: Luxury Swiss Minimalist Grid (left-aligned stark hierarchy, elegant thin accent divider, high-impact whitespace, zero waves).\n"
+                "  * Choice B: Centered Executive Monogram & Symmetrical Horizon (centered luxury monogram at top, prominent name centered, horizontal contact matrix below).\n"
+                "  * Choice C: Vertical Brand Sidebar Pillar (distinct contrasting vertical brand pillar on left/right, spacious credential area).\n"
+                "  * Choice D: Sharp Angular / Origami Polygonal Facets (bold diagonal polygon clips, crisp architectural cuts).\n"
+            )
+            if is_not_color:
+                redesign_blocks.append(
+                    "🎨 'NOT COLOR' CONSTRAINT: The user explicitly said 'NOT COLOR'!\n"
+                    "  * KEEP the existing color palette (primary: " + str(active_user_data.get('primary_color') or '#090d16') + ", accent: " + str(active_user_data.get('accent_color') or '#d4af37') + ").\n"
+                    "  * Do NOT change the colors — focus 100% on a COMPLETELY DIFFERENT layout geometry and visual architecture!\n"
+                )
+        else:
+            redesign_blocks.append(
+                "1. DYNAMIC COLOR & AESTHETIC TRANSFORMATION:\n"
+                f"   - The user's feedback (\"{user_prompt}\") OVERRIDES all previous colors and styles!\n"
+                "   - Synthesize a harmonious, rich palette with high-contrast typography and companion back side.\n"
+            )
+
+        redesign_blocks.append(
+            f"2. USER CONTACT DATA INTEGRITY (PRESERVE ORIGINAL DATA):\n"
+            f"   - The instruction \"{user_prompt}\" is a DESIGN COMMAND, NOT A PERSON'S NAME OR TITLE!\n"
+            f"   - You MUST keep the cardholder's real details intact:\n"
+            f"     * Full Name: {active_user_data.get('name')}\n"
+            f"     * Job Title: {active_user_data.get('title') or active_user_data.get('designation')}\n"
+            f"     * Company: {active_user_data.get('company') or active_user_data.get('company_name')}\n"
+            f"     * Phone: {active_user_data.get('phone')}\n"
+            f"     * Email: {active_user_data.get('email')}\n"
+            f"     * Website: {active_user_data.get('website')}\n"
+            f"     * Address: {active_user_data.get('address')}\n"
         )
-        task_instructions.append(f"PREVIOUS FRONT HTML:\n{previous_card.get('front_html', '')}")
-        task_instructions.append(f"PREVIOUS BACK HTML:\n{previous_card.get('back_html', '')}")
-        task_instructions.append(f"PREVIOUS CSS:\n{previous_card.get('css', '')}")
-        task_instructions.append(f"USER FEEDBACK / REDESIGN INSTRUCTIONS:\n{user_prompt}")
+
+        if not is_design_redesign:
+            redesign_blocks.append(
+                f"3. PREVIOUS HTML & CSS FOR REFERENCE:\n"
+                f"   - Previous Front HTML: {previous_card.get('front_html', '')}\n"
+                f"   - Previous Back HTML: {previous_card.get('back_html', '')}\n"
+                f"   - Previous CSS: {previous_card.get('css', '')}\n"
+            )
+        else:
+            redesign_blocks.append(
+                "3. PREVIOUS DESIGN TO DEVIATE FROM:\n"
+                "   - The user explicitly wants a fresh new design. Generate brand-new HTML and CSS without imitating the previous layout structure!\n"
+            )
+
+        task_instructions.append("\n".join(redesign_blocks))
     else:
         task_instructions.append("THIS IS A NEW BUSINESS CARD REQUEST.")
         task_instructions.append(f"USER PROMPT:\n{user_prompt}")
@@ -437,10 +413,10 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
     user_specs = []
     if active_user_data.get('name'):
         user_specs.append(f"- Full Name: {active_user_data['name']}")
-    if active_user_data.get('title'):
-        user_specs.append(f"- Job Title: {active_user_data['title']}")
-    if active_user_data.get('company'):
-        user_specs.append(f"- Company: {active_user_data['company']}")
+    if active_user_data.get('title') or active_user_data.get('designation'):
+        user_specs.append(f"- Job Title: {active_user_data.get('title') or active_user_data.get('designation')}")
+    if active_user_data.get('company') or active_user_data.get('company_name'):
+        user_specs.append(f"- Company: {active_user_data.get('company') or active_user_data.get('company_name')}")
     if active_user_data.get('phone'):
         user_specs.append(f"- Mobile / Phone: {active_user_data['phone']}")
     if active_user_data.get('email'):
@@ -459,8 +435,7 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
             "CRITICAL: Carefully parse and extract the person's exact Name, Job Title, Company Name, and Contact details directly from the user's prompt text above. DO NOT use placeholder names."
         )
 
-
-    if image_path:
+    if image_path and not is_redesign:
         task_instructions.append(
             "CRITICAL: A REFERENCE BUSINESS CARD IMAGE HAS BEEN ATTACHED.\n"
             "🚨 VISION-DRIVEN BESPOKE REPLICATION (STRICTLY NO FIXED TEMPLATES):\n"
@@ -485,7 +460,11 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
             f"   - Address: {active_user_data.get('address')}"
             "\n5. STRICTLY NO QR CODES: If the reference card image contains a QR code, barcode, or scan box, IGNORE IT COMPLETELY. Do NOT include any QR code, scan box, or barcode on the card."
         )
-
+    elif image_path and is_redesign:
+        task_instructions.append(
+            f"NOTE ON REFERENCE IMAGE: A reference image from earlier is attached for structural layout reference, "
+            f"BUT the user's redesign instruction (\"{user_prompt}\") STRICTLY OVERRIDES its color palette and theme! Do NOT stick to the reference image colors."
+        )
 
     full_prompt = "\n\n".join(task_instructions)
     project_id = ai_config.get("project_id", "")
@@ -494,22 +473,22 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
     if provider == "gemini" or api_key.startswith("AIza") or api_key.startswith("AQ."):
         try:
             res = _call_gemini_api(api_key, full_prompt, image_path, project_id=project_id)
-            return sanitize_and_preserve_user_data(res, active_user_data)
+            return preserve_card_identity(res, active_user_data)
         except Exception as e:
             logger.error(f"Gemini API error: {e}")
             res = render_fallback_card(active_user_data)
             res["bot_reply"] = f"Design created (Gemini API notification: {str(e)[:100]})."
-            return sanitize_and_preserve_user_data(res, active_user_data)
+            return preserve_card_identity(res, active_user_data)
 
     # 2. Try OpenAI API
     try:
         res = _call_openai_api(api_key, full_prompt, image_path)
-        return sanitize_and_preserve_user_data(res, active_user_data)
+        return preserve_card_identity(res, active_user_data)
     except Exception as e:
         logger.error(f"OpenAI API error: {e}")
         res = render_fallback_card(active_user_data)
         res["bot_reply"] = f"Design created (AI notification: {str(e)[:100]})."
-        return sanitize_and_preserve_user_data(res, active_user_data)
+        return preserve_card_identity(res, active_user_data)
 
 
 
@@ -568,7 +547,7 @@ def _call_gemini_api(api_key, prompt_text, image_path=None, project_id=None):
     Calls Google Gemini using google-genai SDK or direct REST API fallback.
     Supported models: gemini-3.8-flash, gemini-3.5-flash-lite, gemini-3.6-flash, gemini-flash-latest.
     """
-    candidate_models = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-flash-latest"]
+    candidate_models = ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-3.8-flash", "gemini-flash-latest"]
     full_prompt_text = f"{SYSTEM_CARD_PROMPT}\n\nTask:\n{prompt_text}"
 
     pil_img, b64_img, mime_type = _prepare_image_data(image_path)

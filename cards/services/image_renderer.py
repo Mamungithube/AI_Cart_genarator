@@ -29,28 +29,43 @@ def _hex_to_rgb(hex_code, fallback=(9, 13, 22)):
 
 def render_html_to_image(front_html, css):
     """
-    Renders front_html + css to PNG bytes (1050x600 px) using wkhtmltoimage if available.
+    Renders front_html + css to PNG bytes (1050x600 px) using headless Chromium or wkhtmltoimage.
     """
     if not front_html:
         return None
 
+    # Check for chromium / chrome / wkhtmltoimage binaries
+    browser_bin = None
+    for candidate in ("chromium", "chromium-browser", "google-chrome", "/usr/bin/chromium", "/usr/bin/chromium-browser"):
+        found = shutil.which(candidate) or (candidate if os.path.exists(candidate) else None)
+        if found:
+            browser_bin = found
+            break
+
     wk = shutil.which("wkhtmltoimage")
     if not wk:
-        # Check standard Linux paths
         for p in ("/usr/bin/wkhtmltoimage", "/usr/local/bin/wkhtmltoimage"):
             if os.path.exists(p):
                 wk = p
                 break
-    if not wk:
+
+    if not browser_bin and not wk:
         return None
 
     full_html = f"""<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=1050, height=600, initial-scale=1">
 <style>
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-html, body {{ width: 1050px; height: 600px; overflow: hidden; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }}
+html, body {{
+    width: 1050px;
+    height: 600px;
+    overflow: hidden;
+    background: transparent;
+    font-family: 'Roboto', 'Liberation Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}}
 {css or ''}
 </style>
 </head>
@@ -69,21 +84,42 @@ html, body {{ width: 1050px; height: 600px; overflow: hidden; background: transp
         with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as p_file:
             p_path = p_file.name
 
-        cmd = [
-            wk,
-            "--width", "1050",
-            "--height", "600",
-            "--enable-local-file-access",
-            "--quality", "95",
-            h_path,
-            p_path
-        ]
-        ret = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=8)
-        if ret.returncode == 0 and os.path.exists(p_path) and os.path.getsize(p_path) > 1000:
-            with open(p_path, "rb") as f:
-                return f.read()
+        # 1. High-fidelity rendering via headless Chromium
+        if browser_bin:
+            cmd = [
+                browser_bin,
+                "--headless=new",
+                "--no-sandbox",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+                "--hide-scrollbars",
+                "--force-device-scale-factor=1",
+                "--window-size=1050,600",
+                f"--screenshot={p_path}",
+                f"file://{h_path}"
+            ]
+            ret = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=12)
+            if ret.returncode == 0 and os.path.exists(p_path) and os.path.getsize(p_path) > 1000:
+                with open(p_path, "rb") as f:
+                    return f.read()
+
+        # 2. Secondary fallback via wkhtmltoimage
+        if wk:
+            cmd = [
+                wk,
+                "--width", "1050",
+                "--height", "600",
+                "--enable-local-file-access",
+                "--quality", "95",
+                h_path,
+                p_path
+            ]
+            ret = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=8)
+            if ret.returncode == 0 and os.path.exists(p_path) and os.path.getsize(p_path) > 1000:
+                with open(p_path, "rb") as f:
+                    return f.read()
     except Exception as e:
-        logger.warning(f"wkhtmltoimage rendering error: {e}")
+        logger.warning(f"HTML rendering error: {e}")
     finally:
         for path in (h_path, p_path):
             if path and os.path.exists(path):

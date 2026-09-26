@@ -60,42 +60,42 @@ TEMPLATES = [
 }
 
 .card-logo-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #d4af37, #aa771c);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #070a11;
   font-weight: 800;
-  font-size: 18px;
+  font-size: 26px;
   box-shadow: 0 6px 16px rgba(212, 175, 55, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .card-company-name {
-  font-size: 14px;
+  font-size: 26px;
   font-weight: 800;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
   text-transform: uppercase;
   color: #ffffff;
 }
 
 .card-company-tagline {
-  font-size: 8.5px;
-  letter-spacing: 2px;
+  font-size: 13px;
+  letter-spacing: 2.5px;
   text-transform: uppercase;
   color: #94a3b8;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .card-badge {
-  padding: 4px 12px;
+  padding: 6px 16px;
   border-radius: 20px;
-  background: rgba(212, 175, 55, 0.1);
-  border: 1px solid rgba(212, 175, 55, 0.3);
-  font-size: 9px;
+  background: rgba(212, 175, 55, 0.12);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  font-size: 13px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: #d4af37;
@@ -104,43 +104,43 @@ TEMPLATES = [
 
 .card-main-info {
   margin-top: auto;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   position: relative;
   z-index: 10;
 }
 
 .card-name {
-  font-size: 23px;
+  font-size: 40px;
   font-weight: 800;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.5px;
   color: #ffffff;
   line-height: 1.15;
   margin: 0;
 }
 
 .card-title {
-  font-size: 10px;
+  font-size: 19px;
   font-weight: 600;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
   text-transform: uppercase;
   color: #d4af37;
-  margin-top: 4px;
+  margin-top: 6px;
 }
 
 .card-accent-bar {
-  width: 28px;
-  height: 2px;
+  width: 60px;
+  height: 3px;
   background: #d4af37;
-  border-radius: 2px;
-  margin-top: 8px;
+  border-radius: 3px;
+  margin-top: 10px;
 }
 
 .card-contact-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 24px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  gap: 14px 28px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   position: relative;
   z-index: 10;
 }
@@ -148,19 +148,19 @@ TEMPLATES = [
 .contact-item {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 9.5px;
-  color: #cbd5e1;
+  gap: 12px;
+  font-size: 16px;
+  color: #e2e8f0;
   font-weight: 500;
-  letter-spacing: 0.2px;
+  letter-spacing: 0.3px;
 }
 
 .contact-chip {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: rgba(212, 175, 55, 0.12);
-  border: 1px solid rgba(212, 175, 55, 0.25);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -169,8 +169,8 @@ TEMPLATES = [
 }
 
 .contact-chip svg {
-  width: 11px;
-  height: 11px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Back Side */
@@ -197,53 +197,47 @@ TEMPLATES = [
 }
 
 .back-logo-big {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
+  width: 76px;
+  height: 76px;
+  border-radius: 18px;
   background: linear-gradient(135deg, #d4af37, #aa771c);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #070a11;
   font-weight: 900;
-  font-size: 26px;
+  font-size: 36px;
   box-shadow: 0 10px 25px rgba(212, 175, 55, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.25);
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .back-brand-title {
-  font-size: 17px;
+  font-size: 32px;
   font-weight: 800;
-  letter-spacing: 3.5px;
+  letter-spacing: 4px;
   text-transform: uppercase;
   color: #ffffff;
   margin: 0;
 }
 
 .back-brand-subtitle {
-  font-size: 8.5px;
+  font-size: 14px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: #d4af37;
-  margin-top: 3px;
-  margin-bottom: 12px;
+  margin-top: 6px;
+  margin-bottom: 20px;
 }
-
-
-
-
-
-
 
 .back-website-pill {
   display: inline-flex;
   align-items: center;
-  padding: 4px 14px;
+  padding: 8px 24px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  font-size: 9px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 15px;
   letter-spacing: 1.2px;
   color: #cbd5e1;
   text-transform: lowercase;
@@ -361,41 +355,41 @@ TEMPLATES = [
 }
 
 .cyber-logo-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
   background: linear-gradient(135deg, #00d2ff, #0072ff);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #060b19;
   font-weight: 900;
-  font-size: 18px;
+  font-size: 26px;
   box-shadow: 0 0 18px rgba(0, 210, 255, 0.4);
 }
 
 .cyber-company-name {
-  font-size: 14px;
+  font-size: 26px;
   font-weight: 800;
-  letter-spacing: 1.8px;
+  letter-spacing: 2px;
   text-transform: uppercase;
   color: #ffffff;
 }
 
 .cyber-tagline {
-  font-size: 8.5px;
+  font-size: 13px;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: #38bdf8;
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 .cyber-tech-badge {
-  padding: 4px 12px;
-  border-radius: 6px;
-  background: rgba(0, 210, 255, 0.1);
-  border: 1px solid rgba(0, 210, 255, 0.3);
-  font-size: 8.5px;
+  padding: 6px 16px;
+  border-radius: 8px;
+  background: rgba(0, 210, 255, 0.12);
+  border: 1px solid rgba(0, 210, 255, 0.35);
+  font-size: 13px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: #00d2ff;
@@ -404,43 +398,43 @@ TEMPLATES = [
 
 .cyber-main-info {
   margin-top: auto;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
   position: relative;
   z-index: 10;
 }
 
 .cyber-name {
-  font-size: 24px;
+  font-size: 40px;
   font-weight: 800;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.5px;
   color: #ffffff;
   line-height: 1.15;
   margin: 0;
 }
 
 .cyber-title {
-  font-size: 10px;
+  font-size: 19px;
   font-weight: 600;
-  letter-spacing: 2.2px;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
   color: #00d2ff;
-  margin-top: 5px;
+  margin-top: 6px;
 }
 
 .cyber-accent-bar {
-  width: 32px;
-  height: 2px;
+  width: 60px;
+  height: 3px;
   background: linear-gradient(90deg, #00d2ff, #0072ff);
-  border-radius: 2px;
-  margin-top: 8px;
+  border-radius: 3px;
+  margin-top: 10px;
 }
 
 .cyber-contact-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 24px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(0, 210, 255, 0.12);
+  gap: 14px 28px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(0, 210, 255, 0.15);
   position: relative;
   z-index: 10;
 }
@@ -448,18 +442,18 @@ TEMPLATES = [
 .cyber-contact-item {
   display: flex;
   align-items: center;
-  gap: 9px;
-  font-size: 9.5px;
-  color: #cbd5e1;
+  gap: 12px;
+  font-size: 16px;
+  color: #e2e8f0;
   font-weight: 500;
 }
 
 .cyber-chip {
-  width: 22px;
-  height: 22px;
-  border-radius: 6px;
-  background: rgba(0, 210, 255, 0.1);
-  border: 1px solid rgba(0, 210, 255, 0.25);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(0, 210, 255, 0.12);
+  border: 1px solid rgba(0, 210, 255, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -468,8 +462,8 @@ TEMPLATES = [
 }
 
 .cyber-chip svg {
-  width: 11px;
-  height: 11px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Back Side */
@@ -496,52 +490,46 @@ TEMPLATES = [
 }
 
 .cyber-back-logo {
-  width: 54px;
-  height: 54px;
-  border-radius: 14px;
+  width: 76px;
+  height: 76px;
+  border-radius: 18px;
   background: linear-gradient(135deg, #00d2ff, #0072ff);
   display: flex;
   align-items: center;
   justify-content: center;
   color: #060b19;
   font-weight: 900;
-  font-size: 26px;
+  font-size: 36px;
   box-shadow: 0 0 25px rgba(0, 210, 255, 0.5);
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .cyber-back-title {
-  font-size: 18px;
+  font-size: 32px;
   font-weight: 800;
-  letter-spacing: 3.5px;
+  letter-spacing: 4px;
   text-transform: uppercase;
   color: #ffffff;
   margin: 0;
 }
 
 .cyber-back-subtitle {
-  font-size: 8.5px;
+  font-size: 14px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: #00d2ff;
-  margin-top: 3px;
-  margin-bottom: 12px;
+  margin-top: 6px;
+  margin-bottom: 20px;
 }
-
-
-
-
-
-
 
 .cyber-website-pill {
   display: inline-flex;
   align-items: center;
-  padding: 4px 14px;
+  padding: 8px 24px;
   border-radius: 20px;
-  background: rgba(0, 210, 255, 0.08);
+  background: rgba(0, 210, 255, 0.1);
   border: 1px solid rgba(0, 210, 255, 0.25);
-  font-size: 9px;
+  font-size: 15px;
   letter-spacing: 1.2px;
   color: #38bdf8;
   text-transform: lowercase;
@@ -643,44 +631,44 @@ TEMPLATES = [
 .swiss-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
 }
 
 .swiss-logo-icon {
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
+  width: 50px;
+  height: 50px;
+  border-radius: 10px;
   background: #0f172a;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
   font-weight: 800;
-  font-size: 16px;
+  font-size: 26px;
 }
 
 .swiss-company-name {
-  font-size: 13.5px;
+  font-size: 26px;
   font-weight: 800;
-  letter-spacing: 1.5px;
+  letter-spacing: 2px;
   text-transform: uppercase;
   color: #0f172a;
 }
 
 .swiss-tagline {
-  font-size: 8px;
+  font-size: 13px;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: #64748b;
-  margin-top: 1px;
+  margin-top: 3px;
 }
 
 .swiss-badge {
-  padding: 4px 10px;
-  border-radius: 4px;
+  padding: 6px 16px;
+  border-radius: 6px;
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
-  font-size: 8.5px;
+  font-size: 13px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: #334155;
@@ -689,11 +677,11 @@ TEMPLATES = [
 
 .swiss-main-info {
   margin-top: auto;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .swiss-name {
-  font-size: 24px;
+  font-size: 40px;
   font-weight: 800;
   letter-spacing: -0.5px;
   color: #0f172a;
@@ -702,43 +690,43 @@ TEMPLATES = [
 }
 
 .swiss-title {
-  font-size: 10px;
+  font-size: 19px;
   font-weight: 600;
-  letter-spacing: 2px;
+  letter-spacing: 1.5px;
   text-transform: uppercase;
   color: #2563eb;
-  margin-top: 5px;
+  margin-top: 6px;
 }
 
 .swiss-accent-bar {
-  width: 26px;
-  height: 2px;
+  width: 60px;
+  height: 3px;
   background: #2563eb;
-  margin-top: 8px;
-  border-radius: 2px;
+  margin-top: 10px;
+  border-radius: 3px;
 }
 
 .swiss-contact-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 24px;
-  padding-top: 14px;
+  gap: 14px 28px;
+  padding-top: 18px;
   border-top: 1px solid #e2e8f0;
 }
 
 .swiss-contact-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 9.5px;
+  gap: 12px;
+  font-size: 16px;
   color: #334155;
   font-weight: 500;
 }
 
 .swiss-chip {
-  width: 20px;
-  height: 20px;
-  border-radius: 4px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   display: flex;
@@ -749,8 +737,8 @@ TEMPLATES = [
 }
 
 .swiss-chip svg {
-  width: 10px;
-  height: 10px;
+  width: 16px;
+  height: 16px;
 }
 
 /* Back Side */
@@ -774,51 +762,45 @@ TEMPLATES = [
 }
 
 .swiss-back-logo {
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
+  width: 76px;
+  height: 76px;
+  border-radius: 16px;
   background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #0f172a;
   font-weight: 900;
-  font-size: 24px;
-  margin-bottom: 10px;
+  font-size: 36px;
+  margin-bottom: 14px;
 }
 
 .swiss-back-title {
-  font-size: 17px;
+  font-size: 32px;
   font-weight: 800;
-  letter-spacing: 3px;
+  letter-spacing: 4px;
   text-transform: uppercase;
   color: #ffffff;
   margin: 0;
 }
 
 .swiss-back-subtitle {
-  font-size: 8.5px;
+  font-size: 14px;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: #94a3b8;
-  margin-top: 3px;
-  margin-bottom: 12px;
+  margin-top: 6px;
+  margin-bottom: 20px;
 }
-
-
-
-
-
-
 
 .swiss-website-pill {
   display: inline-flex;
   align-items: center;
-  padding: 4px 14px;
+  padding: 8px 24px;
   border-radius: 20px;
   background: rgba(255, 255, 255, 0.08);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  font-size: 9px;
+  font-size: 15px;
   letter-spacing: 1px;
   color: #cbd5e1;
   text-transform: lowercase;
