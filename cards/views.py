@@ -186,28 +186,11 @@ class CardChatAPIView(APIView):
             session_id_str = session_id_str or request.POST.get('session_id')
 
         prompt = str(prompt).strip()
-        reference_image_file = (
-            request.FILES.get('reference_image') or
-            request.FILES.get('image') or
-            request.FILES.get('file') or
-            request.FILES.get('card_image') or
-            (next(iter(request.FILES.values())) if request.FILES else None)
-        )
+        reference_image_file = request.FILES.get('reference_image')
 
-        if not prompt:
-            if reference_image_file:
-                error_msg = "Prompt is required. Please enter your card details (Name, Title, Company, Phone, etc.) or instructions along with the reference image."
-            else:
-                error_msg = "Prompt is required. Please enter your business card details or design prompt."
-
+        if not prompt and not reference_image_file:
             return Response(
-                {
-                    "status": "error",
-                    "success": false,
-                    "message": error_msg,
-                    "error": "Prompt is required",
-                    "errors": [error_msg]
-                },
+                {"status": "error", "error": "Please provide 'message' or a reference image."},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -391,35 +374,10 @@ class CardSessionHistoryAPIView(APIView):
         if not prompt and request.POST:
             prompt = request.POST.get('message') or request.POST.get('prompt') or ""
             
-        prompt = str(prompt).strip()
-        reference_image_file = (
-            request.FILES.get('reference_image') or
-            request.FILES.get('image') or
-            request.FILES.get('file') or
-            request.FILES.get('card_image') or
-            (next(iter(request.FILES.values())) if request.FILES else None)
-        )
-
-        if not prompt:
-            if reference_image_file:
-                error_msg = "Prompt is required. Please enter your redesign instructions along with the reference image."
-            else:
-                error_msg = "Prompt is required. Please enter your redesign prompt."
-
-            return Response(
-                {
-                    "status": "error",
-                    "success": false,
-                    "message": error_msg,
-                    "error": "Prompt is required",
-                    "errors": [error_msg]
-                },
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
+        reference_image_file = request.FILES.get('reference_image')
         return chat_view._handle_card_turn(
             request,
-            prompt=prompt,
+            prompt=str(prompt).strip(),
             session_id_str=str(session_id),
             reference_image_file=reference_image_file
         )
