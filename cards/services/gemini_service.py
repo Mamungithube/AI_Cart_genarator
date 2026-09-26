@@ -87,6 +87,7 @@ Your code must dynamically adapt to whatever visual style, geometry, or referenc
      * **Executive Luxury / Swiss Minimalist / Modern Corporate**: Use pristine negative space, elegant typography hierarchy, subtle radial glows, or fine hairline borders.
    - Extract the exact color palette (primary canvas, secondary gradients, accent highlights, and text tones) directly from the reference image.
    - Replicate the exact spatial layout: Place the brand logo, company name, cardholder credentials, and contact rows in the corresponding layout zones seen in the reference.
+   - Ignore QR Codes & Barcodes: If the reference card image contains any QR code, barcode, or scan box, IGNORE IT COMPLETELY. Do NOT replicate or render any QR codes or barcodes on the business card. Keep that area clean with elegant negative space or a luxury monogram emblem instead.
 
 2. **Autonomous Design Synthesis (When No Image is Provided)**:
    - Dynamically craft a brand-new, bespoke visual identity inspired by the user's prompt, industry, company name, and aesthetic mood:
@@ -122,6 +123,7 @@ The back side must share the exact same aesthetic DNA, color scheme, and graphic
 2. NO decorative shape or SVG may ever cover, clip, or collide with any text.
 3. NO hardcoded placeholder or dummy text ("YOUR NAME", "GRAPHIC DESIGNER", "123 Dummy Street", "Lorem Ipsum").
 4. NO low contrast text (e.g. dark text on dark background, or light text on light shapes).
+5. STRICTLY NO QR CODES OR BARCODES: Even if the user reference card image contains a QR code, barcode, or scan box, NEVER generate or include any QR code, barcode, QR SVG, or scan frame in the Front HTML, Back HTML, or CSS. Completely omit all QR codes from the design!
 
 ### OUTPUT FORMAT:
 You MUST output ONLY valid JSON matching this schema:
@@ -363,6 +365,15 @@ def sanitize_and_preserve_user_data(ai_data, active_user_data):
         if target in back_html:
             back_html = back_html.replace(target, rep)
 
+    # Strip any accidental QR code or barcode elements
+    for qr_pattern in [
+        r'''<div[^>]*class=["'][^"']*(?:qr|barcode|scan-code|scan_code)[^"']*["'][^>]*>[\s\S]*?</div>''',
+        r'''<div[^>]*id=["'][^"']*(?:qr|barcode|scan-code|scan_code)[^"']*["'][^>]*>[\s\S]*?</div>''',
+        r'''<svg[^>]*class=["'][^"']*(?:qr|barcode)[^"']*["'][^>]*>[\s\S]*?</svg>''',
+    ]:
+        front_html = re.sub(qr_pattern, '', front_html, flags=re.IGNORECASE)
+        back_html = re.sub(qr_pattern, '', back_html, flags=re.IGNORECASE)
+
     ai_data['front_html'] = front_html
     ai_data['back_html'] = back_html
     return ai_data
@@ -469,6 +480,7 @@ def generate_business_card_with_ai(user_prompt, image_path=None, previous_card=N
             f"   - Email: {active_user_data.get('email')}\n"
             f"   - Website: {active_user_data.get('website')}\n"
             f"   - Address: {active_user_data.get('address')}"
+            "\n5. STRICTLY NO QR CODES: If the reference card image contains a QR code, barcode, or scan box, IGNORE IT COMPLETELY. Do NOT include any QR code, scan box, or barcode on the card."
         )
 
 

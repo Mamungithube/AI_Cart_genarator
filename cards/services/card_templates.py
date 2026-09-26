@@ -230,32 +230,11 @@ TEMPLATES = [
   margin-bottom: 12px;
 }
 
-.back-qr-box {
-  padding: 7px;
-  background: #ffffff;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
-  border: 1px solid rgba(212, 175, 55, 0.4);
-  margin-bottom: 6px;
-}
 
-.back-qr-box svg {
-  width: 48px;
-  height: 48px;
-}
 
-.back-qr-label {
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: #d4af37;
-  margin-bottom: 10px;
-}
+
+
+
 
 .back-website-pill {
   display: inline-flex;
@@ -323,27 +302,6 @@ TEMPLATES = [
     <div class="back-logo-big">{initial}</div>
     <h1 class="back-brand-title">{company}</h1>
     <div class="back-brand-subtitle">{tagline}</div>
-    
-    <div class="back-qr-box">
-      <svg viewBox="0 0 100 100" fill="#070a11">
-        <rect x="5" y="5" width="25" height="25" fill="#070a11" />
-        <rect x="10" y="10" width="15" height="15" fill="#ffffff" />
-        <rect x="14" y="14" width="7" height="7" fill="#070a11" />
-        <rect x="70" y="5" width="25" height="25" fill="#070a11" />
-        <rect x="75" y="10" width="15" height="15" fill="#ffffff" />
-        <rect x="79" y="14" width="7" height="7" fill="#070a11" />
-        <rect x="5" y="70" width="25" height="25" fill="#070a11" />
-        <rect x="10" y="75" width="15" height="15" fill="#ffffff" />
-        <rect x="14" y="79" width="7" height="7" fill="#070a11" />
-        <rect x="36" y="8" width="6" height="6" fill="#070a11"/>
-        <rect x="46" y="14" width="8" height="8" fill="#070a11"/>
-        <rect x="36" y="24" width="10" height="6" fill="#070a11"/>
-        <rect x="40" y="40" width="20" height="20" fill="#070a11"/>
-        <rect x="68" y="44" width="8" height="12" fill="#070a11"/>
-        <rect x="70" y="72" width="18" height="18" fill="#070a11"/>
-      </svg>
-    </div>
-    <div class="back-qr-label">SCAN TO CONNECT</div>
     
     <div class="back-website-pill">{website}</div>
   </div>
@@ -570,32 +528,11 @@ TEMPLATES = [
   margin-bottom: 12px;
 }
 
-.cyber-back-qr {
-  padding: 7px;
-  background: #ffffff;
-  border-radius: 8px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 6px 20px rgba(0,0,0,0.5);
-  border: 1px solid rgba(0, 210, 255, 0.4);
-  margin-bottom: 6px;
-}
 
-.cyber-back-qr svg {
-  width: 48px;
-  height: 48px;
-}
 
-.cyber-back-tag {
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: #00d2ff;
-  margin-bottom: 10px;
-}
+
+
+
 
 .cyber-website-pill {
   display: inline-flex;
@@ -663,27 +600,6 @@ TEMPLATES = [
     <div class="cyber-back-logo">{initial}</div>
     <h1 class="cyber-back-title">{company}</h1>
     <div class="cyber-back-subtitle">{tagline}</div>
-    
-    <div class="cyber-back-qr">
-      <svg viewBox="0 0 100 100" fill="#060b19">
-        <rect x="5" y="5" width="25" height="25" fill="#060b19" />
-        <rect x="10" y="10" width="15" height="15" fill="#ffffff" />
-        <rect x="14" y="14" width="7" height="7" fill="#060b19" />
-        <rect x="70" y="5" width="25" height="25" fill="#060b19" />
-        <rect x="75" y="10" width="15" height="15" fill="#ffffff" />
-        <rect x="79" y="14" width="7" height="7" fill="#060b19" />
-        <rect x="5" y="70" width="25" height="25" fill="#060b19" />
-        <rect x="10" y="75" width="15" height="15" fill="#ffffff" />
-        <rect x="14" y="79" width="7" height="7" fill="#060b19" />
-        <rect x="36" y="8" width="6" height="6" fill="#060b19"/>
-        <rect x="46" y="14" width="8" height="8" fill="#060b19"/>
-        <rect x="36" y="24" width="10" height="6" fill="#060b19"/>
-        <rect x="40" y="40" width="20" height="20" fill="#060b19"/>
-        <rect x="68" y="44" width="8" height="12" fill="#060b19"/>
-        <rect x="70" y="72" width="18" height="18" fill="#060b19"/>
-      </svg>
-    </div>
-    <div class="cyber-back-tag">SCAN TO CONNECT</div>
     
     <div class="cyber-website-pill">{website}</div>
   </div>
@@ -889,30 +805,11 @@ TEMPLATES = [
   margin-bottom: 12px;
 }
 
-.swiss-back-qr {
-  padding: 7px;
-  background: #ffffff;
-  border-radius: 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 6px;
-}
 
-.swiss-back-qr svg {
-  width: 46px;
-  height: 46px;
-}
 
-.swiss-back-tag {
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: #94a3b8;
-  margin-bottom: 10px;
-}
+
+
+
 
 .swiss-website-pill {
   display: inline-flex;
@@ -980,27 +877,6 @@ TEMPLATES = [
     <div class="swiss-back-logo">{initial}</div>
     <h1 class="swiss-back-title">{company}</h1>
     <div class="swiss-back-subtitle">{tagline}</div>
-    
-    <div class="swiss-back-qr">
-      <svg viewBox="0 0 100 100" fill="#0f172a">
-        <rect x="5" y="5" width="25" height="25" fill="#0f172a" />
-        <rect x="10" y="10" width="15" height="15" fill="#ffffff" />
-        <rect x="14" y="14" width="7" height="7" fill="#0f172a" />
-        <rect x="70" y="5" width="25" height="25" fill="#0f172a" />
-        <rect x="75" y="10" width="15" height="15" fill="#ffffff" />
-        <rect x="79" y="14" width="7" height="7" fill="#0f172a" />
-        <rect x="5" y="70" width="25" height="25" fill="#0f172a" />
-        <rect x="10" y="75" width="15" height="15" fill="#ffffff" />
-        <rect x="14" y="79" width="7" height="7" fill="#0f172a" />
-        <rect x="36" y="8" width="6" height="6" fill="#0f172a"/>
-        <rect x="46" y="14" width="8" height="8" fill="#0f172a"/>
-        <rect x="36" y="24" width="10" height="6" fill="#0f172a"/>
-        <rect x="40" y="40" width="20" height="20" fill="#0f172a"/>
-        <rect x="68" y="44" width="8" height="12" fill="#0f172a"/>
-        <rect x="70" y="72" width="18" height="18" fill="#0f172a"/>
-      </svg>
-    </div>
-    <div class="swiss-back-tag">SCAN TO CONNECT</div>
     
     <div class="swiss-website-pill">{website}</div>
   </div>

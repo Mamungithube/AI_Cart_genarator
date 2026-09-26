@@ -62,7 +62,6 @@ def render_business_card_image(card_data):
     font_tagline = ImageFont.load_default(size=14)
     font_contact = ImageFont.load_default(size=16)
     font_emblem = ImageFont.load_default(size=26)
-    font_qr_label = ImageFont.load_default(size=12)
 
     # 5. Top Header (Company & Logo)
     initial = (company[:1] if company else "C").upper()
@@ -99,44 +98,18 @@ def render_business_card_image(card_data):
         draw.text((110, y_pos + 7), val, fill=text_rgb, font=font_contact)
         y_pos += 46
 
-    # 8. Modern QR Code Box on the right side
-    qr_x = width - 240
-    qr_y = 180
-    qr_size = 170
+    # 8. Clean Modern Brand Monogram Badge on the right side (Strictly No QR Code)
+    badge_x = width - 220
+    badge_y = 190
+    badge_size = 140
 
-    # QR background container
-    draw.rounded_rectangle([qr_x, qr_y, qr_x + qr_size, qr_y + qr_size], radius=14, fill=(255, 255, 255), outline=accent_rgb, width=2)
-
-    # Draw geometric QR pattern blocks inside
-    px = qr_x + 18
-    py = qr_y + 18
-    block_color = (15, 23, 42)
-
-    # Top-left corner
-    draw.rectangle([px, py, px + 36, py + 36], fill=block_color)
-    draw.rectangle([px + 8, py + 8, px + 28, py + 28], fill=(255, 255, 255))
-    draw.rectangle([px + 14, py + 14, px + 22, py + 22], fill=block_color)
-
-    # Top-right corner
-    draw.rectangle([px + 96, py, px + 132, py + 36], fill=block_color)
-    draw.rectangle([px + 104, py + 8, px + 124, py + 28], fill=(255, 255, 255))
-    draw.rectangle([px + 110, py + 14, px + 118, py + 22], fill=block_color)
-
-    # Bottom-left corner
-    draw.rectangle([px, py + 96, px + 36, py + 132], fill=block_color)
-    draw.rectangle([px + 8, py + 104, px + 28, py + 124], fill=(255, 255, 255))
-    draw.rectangle([px + 14, py + 110, px + 22, py + 118], fill=block_color)
-
-    # Center matrix data dots
-    draw.rectangle([px + 48, py + 10, px + 62, py + 24], fill=block_color)
-    draw.rectangle([px + 72, py + 16, px + 84, py + 28], fill=block_color)
-    draw.rectangle([px + 44, py + 48, px + 88, py + 88], fill=block_color)
-    draw.rectangle([px + 98, py + 60, px + 118, py + 80], fill=block_color)
-    draw.rectangle([px + 60, py + 104, px + 90, py + 124], fill=block_color)
-    draw.rectangle([px + 104, py + 104, px + 128, py + 128], fill=block_color)
-
-    # QR Label underneath
-    draw.text((qr_x + 18, qr_y + qr_size + 14), "SCAN TO CONNECT", fill=accent_rgb, font=font_qr_label)
+    # Decorative backdrop emblem
+    draw.rounded_rectangle([badge_x, badge_y, badge_x + badge_size, badge_y + badge_size], radius=24, fill=(15, 23, 42), outline=accent_rgb, width=2)
+    badge_initial = (company[:1] if company else (name[:1] if name else "V")).upper()
+    font_badge = ImageFont.load_default(size=48)
+    font_badge_sub = ImageFont.load_default(size=11)
+    draw.text((badge_x + 48, badge_y + 36), badge_initial, fill=accent_rgb, font=font_badge)
+    draw.text((badge_x + 28, badge_y + 104), "EXECUTIVE", fill=(148, 163, 184), font=font_badge_sub)
 
     # Bottom decorative accent bar
     draw.rectangle([0, height - 6, width, height], fill=accent_rgb)
