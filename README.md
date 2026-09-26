@@ -1,61 +1,66 @@
 # 🪪 AI Business Card Studio (Django + Gemini + Docker)
 
-একটি আধুনিক এবং প্রফেশনাল ভিজিটিং কার্ড জেনারেটর ও রিডিজাইনার ওয়েব অ্যাপ্লিকেশন। এটি ব্যবহারকারীর সাধারণ টেক্সট প্রম্পট ও রেফারেন্স ইমেজ থেকে স্বয়ংক্রিয়ভাবে এক্সিকিউটিভ বিজনেস কার্ড (Front & Back) তৈরি ও রিডিজাইন করতে পারে।
+A modern, professional visiting card generator and iterative redesigner web application. It autonomously synthesizes executive business cards (Front & Back) from natural language prompts and reference images using Google Gemini Vision AI.
 
 ---
 
-## 🚀 লাইভ এক্সেস
+## 🚀 Live Access
 
-> **গুরুত্বপূর্ণ নোট:** Google Chrome ও Firefox ব্রাউজার তাদের অভ্যন্তরীণ সিকিউরিটি পলিসির কারণে পোর্ট `6000` (X11 port) কে `ERR_UNSAFE_PORT` হিসেবে ব্লক করে রাখে। তাই ব্রাউজারে সহজে ওপেন করার জন্য পোর্ট **`6001`** যোগ করা হয়েছে (এবং ব্যাকএন্ডে পোর্ট `6000` ও চালু আছে):
+> **Note on Browser Port Security:** Modern web browsers (Google Chrome, Mozilla Firefox) block port `6000` (X11 port) by default with `ERR_UNSAFE_PORT`. Therefore, external access is routed through port **`6001`** (and backend port `6000` remains active internally):
 
-* **ব্রাউজারে ওয়েব অ্যাপ UI:** **[http://localhost:6001](http://localhost:6001)**
-* **Health Check API:** [http://localhost:6001/api/health/](http://localhost:6001/api/health/) (বা `http://localhost:6000/api/health/`)
+* **Web UI Dashboard:** **[http://localhost:6001](http://localhost:6001)**
+* **Health Check API:** [http://localhost:6001/api/health/](http://localhost:6001/api/health/) (or `http://localhost:6000/api/health/`)
 * **AI Key Config API:** [http://localhost:6001/api/config/openai-key/](http://localhost:6001/api/config/openai-key/)
 
-
 ---
 
-## 📡 API এন্ডপয়েন্টসমূহ
+## 📡 API Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/generate-card/` | নতুন কার্ড তৈরি (প্রম্পট ও অপশনাল রেফারেন্স ইমেজ সহ) |
-| `GET` | `/api/generate-card/` | সাম্প্রতিক কার্ড সেশনগুলোর তালিকা |
-| `POST` | `/api/generate-card/<uuid:session_id>/` | **পূর্বের কার্ড রিডিজাইন করা** (Session ID অনুযায়ী পরবর্তী প্রম্পট) |
-| `GET` | `/api/generate-card/<uuid:session_id>/` | সেশনের সম্পূর্ণ চ্যাট হিস্ট্রি ও বর্তমান কার্ড কোড |
-| `GET` | `/api/health/` | সিস্টেম ও ডকার হেলথ স্ট্যাটাস |
-| `GET/POST`| `/api/config/openai-key/` | Gemini / OpenAI API Key কনফিগারেশন ও যাচাই |
-| `GET/POST`| `/config/openai-key` | API Key রুট এলিয়াস |
+| `POST` | `/api/generate-card/` | Generate a new business card (supports natural language prompt & optional reference image) |
+| `GET` | `/api/generate-card/` | List recent card generation sessions |
+| `POST` | `/api/generate-card/<uuid:session_id>/` | **Iterative Card Redesign** (Submit follow-up chat feedback for an existing card session) |
+| `GET` | `/api/generate-card/<uuid:session_id>/` | Retrieve full chat history, versions, and current HTML/CSS card code |
+| `POST` | `/api/extract/` | OCR & contact extraction from visiting card image via Gemini Vision (`X-API-Secret` required) |
+| `GET` | `/api/health/` | Service health status and Docker container check |
+| `GET/POST`| `/api/config/openai-key/` | Gemini / OpenAI API key configuration and validation |
+| `GET/POST`| `/config/openai-key` | API key route alias |
 
 ---
 
-## 🛠️ প্রধান ফিচারসমূহ
+## 🛠️ Key Features
 
-1. **চ্যাটবট স্টাইল ইনপুট (Free-form Prompt):**
-   - কোনো বাধা-ধরা ফর্ম ফিল্ড নেই। চ্যাটবক্সে স্বাভাবিক ভাষায় আপনার নাম, পদবি, কোম্পানি, ফোন, ইমেইল ইত্যাদি লিখে দিলেই এআই বুঝে নেবে।
-2. **রেফারেন্স ইমেজ দিয়ে ডিজাইন (Multimodal Gemini AI):**
-   - যেকোনো ভিজিটিং কার্ডের ছবি ড্রপ বা আপলোড করলে এআই সেই ছবির লেআউট, কালার স্কিম ও ফন্ট স্টাইল নকল করে কার্ড ডিজাইন করবে।
-3. **ইটারেটিভ রিডিজাইন (Session ID দিয়ে):**
-   - পূর্বের কার্ড বজায় রেখে চ্যাটে পরবর্তী প্রম্পট দিতে পারবেন (যেমন: *"কালারটা নেভি ব্লু করো"*, *"ফন্ট বড় করো"*, *"লোগো ডানে সরাও"*), আর এআই সাথে সাথে আপডেট করে দেবে।
-4. **প্রফেশনাল স্ট্যান্ডার্ড (Front & Back View):**
-   - আন্তর্জাতিক স্ট্যান্ডার্ড সাইজ: `3.5" x 2"` (1.75:1 aspect ratio, 300 DPI প্রিন্ট রেডি)।
-   - ইন্টারঅ্যাক্টিভ 3D Flip অ্যানিমেশন।
-   - এক ক্লিকে **হাই-রেজ্যুলিউশন PNG** এবং **প্রিন্ট-রেডি PDF** ডাউনলোড।
-   - সম্পূর্ণ রেসপন্সিভ HTML ও Scoped CSS কোড কপি করার সুবিধা।
+1. **Free-Form Chatbot Prompting:**
+   - No rigid or tedious forms. Type your name, title, company, phone, email, and design preferences in plain language in the chatbox, and the AI automatically parses every detail.
+2. **Multimodal Reference Image Synthesis (Gemini Vision):**
+   - Drop or upload any reference visiting card image. The AI analyzes its geometry, typography hierarchy, and color palette, replicating the aesthetic layout with clean, custom code.
+   - **Smart QR Filtering:** Automatically ignores QR codes/barcodes from reference images, keeping cards clean and executive.
+3. **Multi-Turn Iterative Redesign (Session ID):**
+   - Refine existing designs seamlessly through chat feedback (e.g., *"Change primary color to navy blue"*, *"Make the font bolder"*, *"Align logo to the right"*). The AI preserves all user data across iterations.
+4. **Print-Ready Professional Standards (Front & Back View):**
+   - International standard size: `3.5" x 2"` (1.75:1 aspect ratio, 300 DPI print-ready canvas).
+   - Interactive 3D flip animation for instant previewing.
+   - One-click **High-Resolution PNG** and **Print-Ready PDF** downloads.
+   - Clean, scoped HTML and modern CSS ready for copying.
 
 ---
 
-## 🐳 Docker কমান্ডসমূহ
+## 🐳 Docker Commands
 
-* **কন্টেইনার চালু করা:**
+* **Start containers in background:**
   ```bash
   docker compose up -d
   ```
-* **লগ দেখা:**
+* **View live logs:**
   ```bash
   docker compose logs -f
   ```
-* **কন্টেইনার বন্ধ করা:**
+* **Rebuild and restart after updates:**
+  ```bash
+  docker compose up -d --build web
+  ```
+* **Stop containers:**
   ```bash
   docker compose down
   ```
