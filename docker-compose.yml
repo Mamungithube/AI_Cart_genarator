@@ -14,6 +14,9 @@ services:
       - API_SECRET_KEY=${API_SECRET_KEY:-card_sec_9a7d3e5f1b2c4d8e0f6a5b4c3d2e1f0a}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GOOGLE_VISION_API_KEY=${GOOGLE_VISION_API_KEY:-}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-3}
+      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-180}
     expose:
       - "8000"
 
@@ -21,6 +24,7 @@ services:
     image: nginx:alpine
     restart: unless-stopped
     ports:
+      - "${NGINX_PORT:-4006}:80"
       - "80:80"
       - "6000:6000"
       - "6001:6001"
