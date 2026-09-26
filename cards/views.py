@@ -170,19 +170,54 @@ class CardChatAPIView(APIView):
         session_id_str = None
 
         if hasattr(request, 'data') and request.data:
-            prompt = request.data.get('message') or request.data.get('prompt') or ""
+            prompt = (
+                request.data.get('message') or
+                request.data.get('massage') or
+                request.data.get('prompt') or
+                ""
+            )
             session_id_str = request.data.get('session_id')
+            nested_data = request.data.get('data')
+            if isinstance(nested_data, dict):
+                prompt = (
+                    prompt or
+                    nested_data.get('message') or
+                    nested_data.get('massage') or
+                    nested_data.get('prompt') or
+                    ""
+                )
+                session_id_str = session_id_str or nested_data.get('session_id')
 
         if not prompt and request.body:
             try:
                 b_data = json.loads(request.body.decode('utf-8'))
-                prompt = b_data.get('message') or b_data.get('prompt') or ""
+                prompt = (
+                    b_data.get('message') or
+                    b_data.get('massage') or
+                    b_data.get('prompt') or
+                    ""
+                )
                 session_id_str = session_id_str or b_data.get('session_id')
+                nested_data = b_data.get('data')
+                if isinstance(nested_data, dict):
+                    prompt = (
+                        prompt or
+                        nested_data.get('message') or
+                        nested_data.get('massage') or
+                        nested_data.get('prompt') or
+                        ""
+                    )
+                    session_id_str = session_id_str or nested_data.get('session_id')
             except Exception:
                 pass
 
         if not prompt:
-            prompt = request.POST.get('message') or request.POST.get('prompt') or ""
+            prompt = (
+                request.POST.get('message') or
+                request.POST.get('massage') or
+                request.POST.get('prompt') or
+                ""
+            )
             session_id_str = session_id_str or request.POST.get('session_id')
 
         prompt = str(prompt).strip()
@@ -308,11 +343,31 @@ class CardChatAPIView(APIView):
             version=session.version
         )
 
+        data_payload = {
+            "massage": prompt,
+            "message": prompt,
+            "session_id": str(session.id),
+            "version": session.version,
+            "card_data": card_data,
+            "image_base64": b64_str,
+            "image_url": b64_str,
+            "card": {
+                "front_html": front_html,
+                "back_html": back_html,
+                "css": css,
+                "card_data": card_data,
+            },
+            "title": title or f"{card_data.get('name', 'Card')}",
+            "assistant_message": bot_reply,
+            "bot_reply": bot_reply
+        }
+
         # Response schema matching generator response format with backward compatibility for web frontend UI
         return Response({
             "status": "success",
             "success": True,
             "session_id": str(session.id),
+            "data": data_payload,
             "version": session.version,
             "assistant_message": bot_reply,
             "bot_reply": bot_reply,
@@ -358,6 +413,13 @@ class CardSessionHistoryAPIView(APIView):
         # EXACT response schema matching agent.md lines 101-109 (NO EXTRA KEYS)
         return Response({
             "session_id": str(session.id),
+            "data": {
+                "session_id": str(session.id),
+                "current_version": session.version,
+                "current_state": session.card_data,
+                "card_data": session.card_data,
+                "messages": messages_data,
+            },
             "current_version": session.version,
             "current_state": session.card_data,
             "card_data": session.card_data,
@@ -370,9 +432,12 @@ class CardSessionHistoryAPIView(APIView):
         chat_view = CardChatAPIView()
         prompt = ""
         if hasattr(request, 'data') and request.data:
-            prompt = request.data.get('message') or request.data.get('prompt') or ""
+            prompt = request.data.get('message') or request.data.get('massage') or request.data.get('prompt') or ""
+            nested_data = request.data.get('data')
+            if isinstance(nested_data, dict):
+                prompt = prompt or nested_data.get('message') or nested_data.get('massage') or nested_data.get('prompt') or ""
         if not prompt and request.POST:
-            prompt = request.POST.get('message') or request.POST.get('prompt') or ""
+            prompt = request.POST.get('message') or request.POST.get('massage') or request.POST.get('prompt') or ""
             
         reference_image_file = request.FILES.get('reference_image')
         return chat_view._handle_card_turn(
