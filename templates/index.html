@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Business Card Studio | Prompt to Print-Ready Card</title>
+  <meta name="description" content="Generate and redesign luxury, print-ready corporate business cards with AI and reference image style matching.">
+  
+  <!-- Modern Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@300;400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons for clean UI -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- HTML2Canvas & jsPDF for instant high-res PNG & PDF download -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="/static/css/style.css?v=20260924_fix_v9">
+</head>
+
+<body class="dark-theme">
+  <div class="app-layout">
+    
+    <!-- Top Navigation Bar -->
+    <header class="top-nav">
+      <div class="nav-brand">
+        <div class="brand-logo-icon">
+          <i class="fa-solid fa-address-card"></i>
+        </div>
+        <div class="brand-info">
+          <h1>CARD AI <span>STUDIO</span></h1>
+          <p class="tagline">Gemini Powered Business Card Generator & Redesigner</p>
+        </div>
+      </div>
+
+      <div class="nav-center-session">
+        <div class="session-badge" id="sessionBadge">
+          <span class="pulse-dot"></span>
+          <span id="sessionStatusText">New Session</span>
+          <span class="session-id-pill" id="sessionIdPill" title="Click to copy Session ID"></span>
+        </div>
+      </div>
+
+      <div class="nav-actions">
+        <button class="nav-btn" id="newSessionBtn" title="Start a fresh business card">
+          <i class="fa-solid fa-plus"></i>
+          <span>New Card</span>
+        </button>
+        <button class="nav-btn key-btn" id="openKeyModalBtn" title="Configure Gemini / OpenAI API Key">
+          <i class="fa-solid fa-key"></i>
+          <span id="navKeyStatus">AI Key</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Workspace Split Container -->
+    <main class="workspace-container">
+      
+      <!-- LEFT COLUMN: AI Chat & Prompt Workspace -->
+      <section class="chat-workspace">
+        <div class="chat-header">
+          <div class="chat-title-group">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <div>
+              <h3>Prompt & Redesign Assistant</h3>
+              <p>Type contact details, instructions, or attach reference images</p>
+            </div>
+          </div>
+          <div class="chat-tools">
+            <button class="tool-icon-btn" id="clearChatBtn" title="Clear chat messages">
+              <i class="fa-solid fa-rotate-left"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Messages Stream -->
+        <div class="chat-messages" id="chatMessages">
+          <div class="message assistant-msg intro-message">
+            <div class="msg-avatar">
+              <i class="fa-solid fa-robot"></i>
+            </div>
+            <div class="msg-content">
+              <h4>Welcome to AI Business Card Studio!</h4>
+              <p>You can generate professional visiting cards in natural language. Try pasting your information or attaching a reference card design photo:</p>
+              <div class="prompt-chip-list">
+                <button class="prompt-chip" data-prompt="Name: Tanvir Ahmed&#10;Title: Managing Director & CEO&#10;Company: Apex Global Tech&#10;Phone: +880 1711 002233&#10;Email: tanvir@apextech.com&#10;Website: www.apextech.com&#10;Address: Gulshan-2, Dhaka&#10;Style: Sleek obsidian dark theme with luxury brushed gold accents">
+                  👔 Executive Dark & Gold
+                </button>
+                <button class="prompt-chip" data-prompt="Name: Sarah Jenkins&#10;Title: Principal Architect&#10;Company: Studio Form & Space&#10;Phone: +1 415 889 2100&#10;Email: sarah@studioform.design&#10;Website: studioform.design&#10;Address: Soho, New York&#10;Style: Swiss minimalist typography, clean architectural white & slate">
+                  🏛️ Swiss Minimalist Slate
+                </button>
+                <button class="prompt-chip" data-prompt="Name: Dr. Farhan Kabir&#10;Title: Lead AI Researcher&#10;Company: Quantum Matrix Labs&#10;Phone: +880 1822 556677&#10;Email: farhan@qmatrix.ai&#10;Website: qmatrix.ai&#10;Address: Tech Park, Singapore&#10;Style: Modern cybersecurity midnight navy with glowing cyan border">
+                  ⚡ Cyber Navy & Neon Cyan
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Reference Image Upload Drawer (Floating Indicator) -->
+        <div class="image-preview-bar" id="imagePreviewBar" style="display: none;">
+          <div class="preview-thumbnail">
+            <img id="imagePreviewImg" src="" alt="Reference Preview">
+          </div>
+          <div class="preview-details">
+            <span class="preview-label">Reference Design Attached</span>
+            <span class="preview-filename" id="previewFilename">image.jpg</span>
+          </div>
+          <button class="remove-preview-btn" id="removeImageBtn" title="Remove image">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <!-- Chat Input Form -->
+        <form class="chat-input-box" id="chatForm">
+          <input type="file" id="referenceImageInput" accept="image/*" style="display: none;">
+          
+          <div class="input-actions-left">
+            <button type="button" class="attachment-btn" id="attachImageBtn" title="Upload reference card image">
+              <i class="fa-solid fa-paperclip"></i>
+            </button>
+          </div>
+
+          <textarea 
+            id="promptInput" 
+            placeholder="Enter card details or prompt (e.g. Name, Phone, Email, Style) or redesign instructions..." 
+            rows="1"
+            required></textarea>
+
+          <button type="submit" class="send-btn" id="sendBtn" title="Send (Ctrl + Enter)">
+            <i class="fa-solid fa-arrow-up"></i>
+          </button>
+        </form>
+
+        <div class="chat-footer-notes">
+          <span>Tip: After generation, use prompts like <em>"Change color to navy blue"</em> or <em>"Make font bolder"</em> to redesign!</span>
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN: Interactive Live Card Studio -->
+      <section class="card-studio">
+        
+        <!-- Studio Toolbar -->
+        <div class="studio-toolbar">
+          <div class="view-toggles">
+            <button class="view-tab active" data-view="both">
+              <i class="fa-solid fa-table-columns"></i> Both Sides
+            </button>
+            <button class="view-tab" data-view="flip">
+              <i class="fa-solid fa-arrows-rotate"></i> 3D Flip View
+            </button>
+            <button class="view-tab" data-view="front">Front</button>
+            <button class="view-tab" data-view="back">Back</button>
+          </div>
+
+          <div class="export-actions">
+            <button class="action-btn" id="flipCardBtn" title="Flip Card">
+              <i class="fa-solid fa-rotate"></i> Flip
+            </button>
+            <button class="action-btn" id="copyCodeBtn" title="Copy Card HTML & CSS">
+              <i class="fa-regular fa-copy"></i> Code
+            </button>
+            <div class="dropdown-group">
+              <button class="action-btn primary-action-btn" id="downloadPngBtn">
+                <i class="fa-solid fa-download"></i> Download PNG
+              </button>
+              <button class="action-btn secondary-action-btn" id="downloadPdfBtn" title="Download Print-Ready PDF">
+                <i class="fa-solid fa-file-pdf"></i> PDF
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Live Card Canvas Area -->
+        <div class="card-canvas-viewport" id="cardViewport">
+          
+          <div class="viewport-instruction" id="viewportInstruction">
+            <span class="card-spec-tag">Standard Business Card (3.5" × 2" • 1050 × 600 px)</span>
+          </div>
+
+          <!-- Cards Presentation Container -->
+          <div class="card-display-wrapper view-both" id="cardDisplayWrapper">
+            
+            <!-- FRONT SIDE WRAPPER -->
+            <div class="card-side-container" id="frontContainer">
+              <div class="card-side-header">
+                <span class="side-badge">FRONT SIDE</span>
+                <button class="side-dl-btn" onclick="exportSingleCard('frontSideCard', 'front-card.png')" title="Download Front side">
+                  <i class="fa-solid fa-camera"></i>
+                </button>
+              </div>
+              <div class="card-frame" id="frontFrame">
+                <div class="business-card-render-box" id="frontSideCard">
+                  <!-- Dynamic Front HTML will render here -->
+                </div>
+              </div>
+            </div>
+
+            <!-- BACK SIDE WRAPPER -->
+            <div class="card-side-container" id="backContainer">
+              <div class="card-side-header">
+                <span class="side-badge">BACK SIDE</span>
+                <button class="side-dl-btn" onclick="exportSingleCard('backSideCard', 'back-card.png')" title="Download Back side">
+                  <i class="fa-solid fa-camera"></i>
+                </button>
+              </div>
+              <div class="card-frame" id="backFrame">
+                <div class="business-card-render-box" id="backSideCard">
+                  <!-- Dynamic Back HTML will render here -->
+                </div>
+              </div>
+            </div>
+
+            <!-- 3D FLIP CONTAINER (Used in 3D flip mode) -->
+            <div class="flip-card-3d-scene" id="flipScene" style="display: none;">
+              <div class="flip-card-3d-inner" id="flipInner">
+                <div class="flip-face flip-front" id="flipFront"></div>
+                <div class="flip-face flip-back" id="flipBack"></div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Dynamic Scoped CSS Injection Target -->
+          <style id="dynamicCardStyles"></style>
+
+        </div>
+
+        <!-- Card Meta & Quick Inspection Tray -->
+        <div class="card-meta-tray">
+          <div class="meta-tag">
+            <i class="fa-solid fa-fingerprint"></i>
+            <span id="cardTitleMeta">Executive Business Card</span>
+          </div>
+          <div class="meta-tag">
+            <i class="fa-solid fa-palette"></i>
+            <span id="cardPaletteMeta">Auto-Harmonized Palette</span>
+          </div>
+          <div class="meta-tag print-tag">
+            <i class="fa-solid fa-print"></i>
+            <span>300 DPI Print Spec</span>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+  </div>
+
+  <!-- API Key Configuration Modal -->
+  <div class="modal-overlay" id="keyModal" style="display: none;">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-key"></i>
+          <h3>AI Engine Key Configuration</h3>
+        </div>
+        <button class="modal-close-btn" id="closeKeyModalBtn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-desc">
+          Enter your <strong>Google Gemini API Key</strong> (or OpenAI Key) to unlock intelligent reference image analysis and live conversational redesign.
+        </p>
+
+        <div class="key-status-banner" id="keyStatusBanner">
+          <i class="fa-solid fa-circle-check"></i>
+          <span id="keyStatusMsg">Checking API key status...</span>
+        </div>
+
+        <form id="keyConfigForm">
+          <div class="form-group">
+            <label for="providerSelect">AI Provider</label>
+            <select id="providerSelect" class="form-control">
+              <option value="gemini">Google Gemini (Recommended for Reference Images)</option>
+              <option value="openai">OpenAI (GPT-4o Vision)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="apiKeyInput">API Key</label>
+            <div class="input-password-wrapper">
+              <input 
+                type="password" 
+                id="apiKeyInput" 
+                class="form-control" 
+                placeholder="AIzaSy... (Gemini) or sk-... (OpenAI)"
+                required>
+              <button type="button" class="toggle-pw-btn" id="togglePwBtn">
+                <i class="fa-solid fa-eye"></i>
+              </button>
+            </div>
+            <small class="form-tip">The key is stored securely in your project configuration and used directly for requests.</small>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn-cancel" id="cancelKeyModalBtn">Close</button>
+            <button type="submit" class="btn-primary" id="saveKeyBtn">Save API Key</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Code Preview Modal -->
+  <div class="modal-overlay" id="codeModal" style="display: none;">
+    <div class="modal-box code-modal-box">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-code"></i>
+          <h3>Generated Card HTML & CSS</h3>
+        </div>
+        <button class="modal-close-btn" id="closeCodeModalBtn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="code-block-tabs">
+          <button class="code-tab active" data-tab="css">CSS Styles</button>
+          <button class="code-tab" data-tab="front">Front HTML</button>
+          <button class="code-tab" data-tab="back">Back HTML</button>
+        </div>
+        <textarea id="codeViewArea" class="code-textarea" readonly></textarea>
+        <div class="modal-footer">
+          <button type="button" class="btn-primary" id="copyModalCodeBtn">
+            <i class="fa-regular fa-copy"></i> Copy to Clipboard
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Frontend Application Logic -->
+  <script src="/static/js/app.js?v=20260924_fix_v9"></script>
+</body>
+</html>
+

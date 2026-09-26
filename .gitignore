@@ -1,0 +1,39 @@
+# Environment variables & Secrets (CRITICAL: Never push to Git)
+.env
+.env.local
+.env.*.local
+ai_config.json
+
+# Python & Django caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+ENV/
+
+# SQLite Database
+*.sqlite3
+db.sqlite3
+data/
+
+# Static collection & Media uploads
+staticfiles/
+media/*
+!media/.gitkeep
+
+# Previous / Draft folders
+generator/
+
+# OS and IDE files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+
+# Docker local overrides
+docker-compose.override.yml
