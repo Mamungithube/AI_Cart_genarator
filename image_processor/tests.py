@@ -59,11 +59,12 @@ class ImageProcessorAPITests(TestCase):
         self.assertTrue(bool(response.data.get('enhanced_image_base64')))
 
     def test_process_card_missing_openai_key_triggers_notification(self):
-        """When OpenAI API key is missing during process-card, returns 503 and notifies webhook."""
+        """When AI API key is missing during process-card, returns 503 and notifies webhook."""
         from unittest.mock import patch
         test_file = _create_test_image()
 
-        with patch('card_project.key_manager.get_active_openai_key', return_value=''):
+        with patch('card_project.key_manager.get_active_gemini_key', return_value=''), \
+             patch('card_project.key_manager.get_active_openai_key', return_value=''):
             with patch('image_processor.views.send_openai_error_notification') as mock_notify_view:
                 response = self.client.post(
                     self.process_url,
@@ -81,9 +82,10 @@ class ImageProcessorAPITests(TestCase):
         from unittest.mock import patch
         test_file = _create_test_image()
 
-        with patch('card_project.key_manager.get_active_openai_key', return_value='sk-test-key'):
+        with patch('card_project.key_manager.get_active_gemini_key', return_value='test-gemini-key'), \
+             patch('card_project.key_manager.get_active_openai_key', return_value='test-gemini-key'):
             with patch('image_processor.views.crop_business_card', return_value=None):
-                with patch('image_processor.views.extract_with_rotation', side_effect=RuntimeError("OpenAI API error (429): Quota exceeded")):
+                with patch('image_processor.views.extract_with_rotation', side_effect=RuntimeError("Gemini API error (429): Quota exceeded")):
                     with patch('image_processor.views.send_openai_error_notification') as mock_notify_view:
                         response = self.client.post(
                             self.process_url,

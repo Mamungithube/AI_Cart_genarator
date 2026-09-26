@@ -52,10 +52,10 @@ class ProcessCardView(APIView):
             os.environ.get('GOOGLE_VISION_API_KEY') or ''
         ).strip().strip('"').strip("'")
 
-        from card_project.key_manager import get_active_openai_key
-        openai_api_key = get_active_openai_key()
-        if not openai_api_key:
-            err_msg = "OpenAI API key not configured — card extraction requires an active key."
+        from card_project.key_manager import get_active_gemini_key, get_active_openai_key
+        ai_api_key = get_active_gemini_key() or get_active_openai_key()
+        if not ai_api_key:
+            err_msg = "Gemini API key not configured — card extraction requires an active key."
             send_openai_error_notification(err_msg)
             return Response(
                 {"success": False, "error": err_msg},
@@ -83,8 +83,9 @@ class ProcessCardView(APIView):
             rotated_front, rotated_back, details = extract_with_rotation(
                 front_bgr=front_bgr,
                 back_bgr=back_bgr,
-                openai_api_key=openai_api_key,
-                vision_api_key=vision_api_key
+                gemini_api_key=ai_api_key,
+                vision_api_key=vision_api_key,
+                openai_api_key=ai_api_key,
             )
 
             # 3. Base64 encode rotated/enhanced outputs

@@ -207,13 +207,18 @@ Rules:
 """
 
 
-def extract_with_rotation(front_bgr, back_bgr, openai_api_key: str, vision_api_key: str):
+def extract_with_rotation(front_bgr, back_bgr, gemini_api_key: str = None, vision_api_key: str = None, openai_api_key: str = None):
     """
-    Rotates front & back correctly, sends OCR text to GPT-4o-mini (4x faster), and extracts structured data.
+    Rotates front & back correctly, sends OCR text to Gemini Flash, and extracts structured data.
     Runs front and back OCR concurrently when both are provided.
     """
-    if not openai_api_key:
-        err_msg = "OpenAI API key not configured — card extraction requires an active key."
+    active_key = gemini_api_key or openai_api_key
+    if not active_key:
+        from card_project.key_manager import get_active_gemini_key, get_active_openai_key
+        active_key = get_active_gemini_key() or get_active_openai_key()
+
+    if not active_key:
+        err_msg = "Gemini API key not configured — card extraction requires an active key."
         send_openai_error_notification(err_msg)
         raise ValueError(err_msg)
 
@@ -238,9 +243,6 @@ def extract_with_rotation(front_bgr, back_bgr, openai_api_key: str, vision_api_k
     if back_text:
         raw_text = (raw_text + "\n---\n" + back_text).strip()
 
-    card_model = os.environ.get("OPENAI_CARD_MODEL", "gpt-4o-mini").strip()
-    session = _get_http_session()
-
     # 2. Structured JSON parsing via Gemini
     from card_project.gemini_client import call_gemini_json
     try:
@@ -248,7 +250,7 @@ def extract_with_rotation(front_bgr, back_bgr, openai_api_key: str, vision_api_k
             result = call_gemini_json(
                 prompt=_build_prompt(raw_text),
                 temperature=0.1,
-                api_key=openai_api_key,
+                api_key=active_key,
             )
         else:
             # Direct Gemini Vision fallback if Google Vision OCR yielded no text
@@ -273,7 +275,7 @@ def extract_with_rotation(front_bgr, back_bgr, openai_api_key: str, vision_api_k
             result = call_gemini_json(
                 contents=contents,
                 temperature=0.1,
-                api_key=openai_api_key,
+                api_key=active_key,
             )
     except Exception as e:
         err_msg = f"Gemini card extraction error: {e}"
