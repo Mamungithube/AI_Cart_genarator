@@ -251,7 +251,46 @@ class CardChatAPIView(APIView):
             session_id_str = session_id_str or request.POST.get('session_id')
 
         prompt = str(prompt).strip()
-        reference_image_file = request.FILES.get('reference_image')
+
+        # 1. Check multipart/form-data files under all common key names
+        reference_image_file = None
+        if hasattr(request, 'FILES') and request.FILES:
+            reference_image_file = (
+                request.FILES.get('reference_image') or
+                request.FILES.get('image') or
+                request.FILES.get('file') or
+                request.FILES.get('card_image') or
+                request.FILES.get('photo') or
+                next(iter(request.FILES.values()), None)
+            )
+
+        # 2. Check JSON data for Base64 image (either inside 'data' or at root)
+        if not reference_image_file and hasattr(request, 'data') and request.data:
+            raw_b64 = None
+            nested = request.data.get('data')
+            if isinstance(nested, dict):
+                raw_b64 = (
+                    nested.get('reference_image') or
+                    nested.get('image') or
+                    nested.get('card_image') or
+                    nested.get('file')
+                )
+            if not raw_b64:
+                raw_b64 = (
+                    request.data.get('reference_image') or
+                    request.data.get('image') or
+                    request.data.get('card_image') or
+                    request.data.get('file')
+                )
+            if raw_b64 and isinstance(raw_b64, str) and (raw_b64.startswith('data:image') or len(raw_b64) > 100):
+                try:
+                    import base64
+                    if ',' in raw_b64:
+                        raw_b64 = raw_b64.split(',', 1)[1]
+                    img_bytes = base64.b64decode(raw_b64)
+                    reference_image_file = io.BytesIO(img_bytes)
+                except Exception as e:
+                    logger.warning(f"Could not parse base64 reference image: {e}")
 
         if not prompt and not reference_image_file:
             return Response(
@@ -501,7 +540,44 @@ class CardSessionHistoryAPIView(APIView):
                 ""
             )
             
-        reference_image_file = request.FILES.get('reference_image')
+        reference_image_file = None
+        if hasattr(request, 'FILES') and request.FILES:
+            reference_image_file = (
+                request.FILES.get('reference_image') or
+                request.FILES.get('image') or
+                request.FILES.get('file') or
+                request.FILES.get('card_image') or
+                request.FILES.get('photo') or
+                next(iter(request.FILES.values()), None)
+            )
+
+        if not reference_image_file and hasattr(request, 'data') and request.data:
+            raw_b64 = None
+            nested = request.data.get('data')
+            if isinstance(nested, dict):
+                raw_b64 = (
+                    nested.get('reference_image') or
+                    nested.get('image') or
+                    nested.get('card_image') or
+                    nested.get('file')
+                )
+            if not raw_b64:
+                raw_b64 = (
+                    request.data.get('reference_image') or
+                    request.data.get('image') or
+                    request.data.get('card_image') or
+                    request.data.get('file')
+                )
+            if raw_b64 and isinstance(raw_b64, str) and (raw_b64.startswith('data:image') or len(raw_b64) > 100):
+                try:
+                    import base64
+                    if ',' in raw_b64:
+                        raw_b64 = raw_b64.split(',', 1)[1]
+                    img_bytes = base64.b64decode(raw_b64)
+                    reference_image_file = io.BytesIO(img_bytes)
+                except Exception as e:
+                    logger.warning(f"Could not parse base64 reference image: {e}")
+
         return chat_view._handle_card_turn(
             request,
             prompt=str(prompt).strip(),
