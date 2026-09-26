@@ -45,7 +45,7 @@ def call_gemini_json(
     contents: list = None,
     temperature: float = 0.1,
     api_key: str = None,
-    model: str = "gemini-2.0-flash"
+    model: str = "gemini-3.5-flash-lite"
 ) -> dict:
     """
     Calls Google Gemini API with JSON output mode.
@@ -91,7 +91,7 @@ def call_gemini_json(
         logger.warning(f"google.genai SDK call failed: {e}. Falling back to REST API...")
 
     # 3. Direct REST API via requests (zero external SDK requirements)
-    candidate_models = [model, "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    candidate_models = [model, "gemini-3.5-flash-lite", "gemini-3.6-flash", "gemini-flash-latest"]
     session = requests.Session()
     last_error = None
 
